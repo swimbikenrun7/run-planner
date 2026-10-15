@@ -37,3 +37,29 @@ and move as little as possible. Weeks it can't solve are flagged, never dropped.
 ## Push behaviour
 Events are upserted on `<plan_tag>-<date>`. After pushing, events from the same `plan_tag`
 on dates that no longer have a workout are deleted. Race rows are not pushed.
+
+## Importing a plan
+One-time setup (adds the Paces tab and Config keys; safe to rerun):
+
+    python setup_workbook.py plans/plan_builder.xlsx
+
+Then fill in `threshold_pace` in Config (e.g. `7:30/mi`). For each plan:
+
+    python import_plan.py prompt plans/plan_builder.xlsx
+    # paste imports/prompt.md into Claude with the plan; save the CSV it returns
+    python import_plan.py stage plans/plan_builder.xlsx imports/<plan>.csv
+    # review the Import tab: green = already in Library, yellow = similar (fill 'action')
+    python import_plan.py apply plans/plan_builder.xlsx --week-end sun
+    # set race_date / plan_tag / long_run in Config, then layout.py and push.py
+
+To add a plan's workouts to Library without touching Schedule, Config or Layout:
+
+    python import_plan.py apply plans/plan_builder.xlsx --library-only
+
+`action` on the Import tab: `add` keeps the workout as a new Library entry (renamed with
+`-2` if the ID is taken), or type an existing workout_id to use that one instead.
+
+Pace targets in the CSV are keys like `{T}` or `{T+20s}` from the Paces tab; the importer
+turns them into percentages. Offsets are seconds of pace per threshold_pace unit.
+Warmups, cooldowns, single continuous runs and untimed recoveries use `Press lap`
+(the importer rejects workouts that don't).

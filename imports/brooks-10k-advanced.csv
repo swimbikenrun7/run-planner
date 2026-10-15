@@ -1,0 +1,64 @@
+week,day,workout_id,category,name,workout_text,note
+1,Mon,EASY-4MI,easy,Easy 4mi,- Press lap {E} 4mi,
+1,Tue,HILLS-5x1,hills,Hills 5x1',Warmup / - Press lap {WU} 2mi / Hills 5x / - Uphill hard 1m / - 90s {RECOVERY} / Cooldown / - Press lap {WU} 2mi,Jog down in 90s
+1,Wed,EASY-4MI,easy,Easy 4mi,- Press lap {E} 4mi,
+1,Thu,TEMPO-6MI-UPDOWN,tempo,Tempo up/down 6mi,Warmup / - Press lap {WU} 2mi / Main Set 3x / - 1mi {T} / - 1mi {M} / Cooldown / - Press lap {WU} 2mi,Up miles at tempo; down miles at moderate effort
+1,Fri,EASY-3MI,easy,Easy 3mi,- Press lap {E} 3mi,
+1,Sat,LONG-90,long,Long 90',- Press lap {LONG} 90m,
+1,Sun,,,,,Rest or easy cross-train
+2,Mon,EASY-5MI,easy,Easy 5mi,- Press lap {E} 5mi,
+2,Tue,INT-MIX-1,interval,Hard/hills/hard mix,Warmup / - Press lap {WU} 2mi / Set 1 3x / - 1m {I} / - 1m {RECOVERY} / Hills 5x / - Uphill hard 1m / - Press lap Jog down {RECOVERY} / Set 3 3x / - 30s {R} / - 90s {RECOVERY} / Cooldown / - Press lap {WU} 2mi,
+2,Wed,EASY-5MI,easy,Easy 5mi,- Press lap {E} 5mi,
+2,Thu,TEMPO-5x1MI,tempo,Tempo 5x1mi,Warmup / - Press lap {WU} 2mi / Main Set 5x / - 1mi {T} / - 60s {RECOVERY} / Cooldown / - Press lap {WU} 2mi,
+2,Fri,EASY-4MI,easy,Easy 4mi,- Press lap {E} 4mi,
+2,Sat,LONG-90,long,Long 90',- Press lap {LONG} 90m,
+2,Sun,,,,,Rest or easy cross-train
+3,Mon,EASY-6MI,easy,Easy 6mi,- Press lap {E} 6mi,
+3,Tue,INT-MIX-2,interval,Hard/hills/hard mix,Warmup / - Press lap {WU} 2mi / Set 1 3x / - 2m {I} / - 1m {RECOVERY} / Hills 2x / - Uphill hard 90s / - Press lap Jog down {RECOVERY} / - Uphill hard 60s / - Press lap Jog down {RECOVERY} / - Uphill hard 30s / - Press lap Jog down {RECOVERY} / Set 3 3x / - 1m {I} / - 1m {RECOVERY} / Cooldown / - Press lap {WU} 2mi,
+3,Wed,EASY-6MI,easy,Easy 6mi,- Press lap {E} 6mi,
+3,Thu,TEMPO-PROG-7MI,tempo,Progressive tempo 7mi,Warmup / - Press lap {WU} 2mi / Main Set / - 1mi {M} / - 1mi {M-5s} / - 1mi {M-10s} / - 1mi {M-15s} / - 1mi {M-20s} / - 1mi {M-25s} / - 1mi {M-30s} / Cooldown / - Press lap {WU} 2mi,Start moderate and cut down 5s each mile
+3,Fri,EASY-5MI,easy,Easy 5mi,- Press lap {E} 5mi,
+3,Sat,LONG-100,long,Long 1:40,- Press lap {LONG} 100m,
+3,Sun,,,,,Rest or easy cross-train
+4,Mon,EASY-4MI,easy,Easy 4mi,- Press lap {E} 4mi,
+4,Tue,INT-3x3-HILLS-6x45,interval,3x3' + hills 6x45s,Warmup / - Press lap {WU} 2mi / Main Set 3x / - 3m {I} / - 90s {RECOVERY} / Hills 6x / - Uphill hard 45s / - Press lap Jog down {RECOVERY} / Cooldown / - Press lap {WU} 2mi,
+4,Wed,EASY-4MI,easy,Easy 4mi,- Press lap {E} 4mi,
+4,Thu,TEMPO-AEROBIC-8MI,tempo,Aerobic tempo 8mi + strides,Warmup / - Press lap {WU} 2mi / Main Set / - 8mi {T+20s} / Strides 4x / - 100mtr {R} / - 3m {RECOVERY} / Cooldown / - Press lap {WU} 2mi,Aerobic tempo at tempo pace +20s
+4,Fri,,,,,Rest or 3 miles easy
+4,Sat,LONG-105,long,Long 1:45,- Press lap {LONG} 105m,
+4,Sun,,,,,Rest or easy cross-train
+5,Mon,EASY-6MI,easy,Easy 6mi,- Press lap {E} 6mi,
+5,Tue,INT-12x600,interval,12x600 @ GP,Warmup / - Press lap {WU} 2mi / Main Set 12x / - 600mtr {10K} / - 2m {RECOVERY} / Cooldown / - Press lap {WU} 2mi,Equal rest (~rep time); pick up speed through the workout
+5,Wed,EASY-6MI,easy,Easy 6mi,- Press lap {E} 6mi,
+5,Thu,HILLS-3x321,hills,Hills 3x 3/2/1',Warmup / - Press lap {WU} 2mi / Hills 3x / - Uphill moderate 3m / - Press lap Jog down {RECOVERY} / - Uphill hard 2m / - Press lap Jog down {RECOVERY} / - Uphill very hard 1m / - Press lap Jog down {RECOVERY} / Cooldown / - Press lap {WU} 2mi,Increasing effort as the intervals get shorter
+5,Fri,EASY-4MI,easy,Easy 4mi,- Press lap {E} 4mi,
+5,Sat,LONG-90,long,Long 90',- Press lap {LONG} 90m,
+5,Sun,,,,,Rest or easy cross-train
+6,Mon,EASY-7MI,easy,Easy 7mi,- Press lap {E} 7mi,
+6,Tue,INT-6x1K-8x400,interval,6x1k + 8x400,Warmup / - Press lap {WU} 2mi / Set 1 6x / - 1km {10K+5s} / - 2m {RECOVERY} / Set 2 8x / - 400mtr {5K} / - 90s {RECOVERY} / Cooldown / - Press lap {WU} 2mi,
+6,Wed,EASY-6MI,easy,Easy 6mi,- Press lap {E} 6mi,
+6,Thu,TEMPO-2x2MI-1MI,tempo,Tempo 2x2mi + 1mi + strides,Warmup / - Press lap {WU} 2mi / Set 1 2x / - 2mi {T} / - 3m {RECOVERY} / Tempo / - 1mi {T} / Strides 3x / - 150mtr {R} / - 4m {RECOVERY} / Cooldown / - Press lap {WU} 2mi,
+6,Fri,EASY-4MI,easy,Easy 4mi,- Press lap {E} 4mi,
+6,Sat,LONG-105,long,Long 1:45,- Press lap {LONG} 105m,
+6,Sun,,,,,Rest or easy cross-train
+7,Mon,EASY-7MI,easy,Easy 7mi,- Press lap {E} 7mi,
+7,Tue,INT-6x800-250,interval,6x(800 + 250),Warmup / - Press lap {WU} 2mi / Main Set 6x / - 800mtr {5K} / - 1m {RECOVERY} / - 250mtr {R} / - 4m {RECOVERY} / Cooldown / - Press lap {WU} 2mi,Read as a 250 after every 800
+7,Wed,EASY-6MI,easy,Easy 6mi,- Press lap {E} 6mi,
+7,Thu,TEMPO-PROG-8MI,tempo,Progressive tempo 8mi,Warmup / - Press lap {WU} 2mi / Main Set / - 1mi {M} / - 1mi {M-5s} / - 1mi {M-10s} / - 1mi {M-15s} / - 1mi {M-20s} / - 1mi {M-25s} / - 1mi {M-30s} / - 1mi {M-35s} / Cooldown / - Press lap {WU} 2mi,Start moderate and cut down 5s each mile
+7,Fri,EASY-5MI,easy,Easy 5mi,- Press lap {E} 5mi,
+7,Sat,LONG-105,long,Long 1:45,- Press lap {LONG} 105m,
+7,Sun,,,,,Rest or easy cross-train
+8,Mon,EASY-7MI,easy,Easy 7mi,- Press lap {E} 7mi,
+8,Tue,EASY-70-STRIDES,easy,70' as you feel + strides,Warmup / - Press lap {WU} 2mi / Main Set / - Press lap {E} 70m / Strides 9x / - 100mtr {R} / - Press lap Walk back {RECOVERY} / Cooldown / - Press lap {WU} 2mi,70' run as you feel
+8,Wed,EASY-7MI,easy,Easy 7mi,- Press lap {E} 7mi,
+8,Thu,INT-LADDER-2x,interval,2x 3000-200 ladder,Warmup / - Press lap {WU} 2mi / Ladder 2x / - 3000mtr {T-15s} / - 4m {RECOVERY} / - 1600mtr {T-20s} / - 3m {RECOVERY} / - 1200mtr {T-25s} / - 2m {RECOVERY} / - 800mtr {T-30s} / - 2m {RECOVERY} / - 400mtr {I} / - 2m {RECOVERY} / - 200mtr {R} / - 2m {RECOVERY} / Cooldown / - Press lap {WU} 2mi,Start at tempo -15s and get steadily faster
+8,Fri,EASY-6MI,easy,Easy 6mi,- Press lap {E} 6mi,
+8,Sat,LONG-90,long,Long 90',- Press lap {LONG} 90m,
+8,Sun,,,,,Rest or easy cross-train
+9,Mon,EASY-5MI,easy,Easy 5mi,- Press lap {E} 5mi,
+9,Tue,TEMPO-3MI-6x400,tempo,Tempo 3mi + 6x400,Warmup / - Press lap {WU} 2mi / Tempo / - 3mi {T} / - 4m {RECOVERY} / Main Set 6x / - 200mtr {5K} / - 200mtr {RECOVERY} / Cooldown / - Press lap {WU} 2mi,
+9,Wed,EASY-5MI,easy,Easy 5mi,- Press lap {E} 5mi,
+9,Thu,INT-6x400-GP,interval,6x400 @ GP + strides,Warmup / - Press lap {WU} 2mi / Main Set 6x / - 400mtr {10K} / - 60s {RECOVERY} / Strides 4x / - 150mtr {R} / - Press lap Walk back {RECOVERY} / Cooldown / - Press lap {WU} 2mi,
+9,Fri,,,,,Rest or 4 miles easy
+9,Sat,SHAKEOUT-3MI,easy,Pre-race shakeout,- Press lap {E} 3mi / Strides 3x / - 150mtr {10K} / - Press lap Walk back {RECOVERY},
+9,Sun,RACE,race,Race day,,

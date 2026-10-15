@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 import openpyxl
 
 DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
-DEFAULT_HARD = {"interval", "threshold", "tempo", "fartlek", "steady", "long", "race"}
+DEFAULT_HARD = {"interval", "threshold", "tempo", "fartlek", "hills", "steady", "long", "tuneup", "race"}
 DEFAULT_TAPER_DAYS = 2
 
 
