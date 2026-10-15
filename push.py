@@ -189,8 +189,12 @@ def main(argv=None):
     existing = client.list_events(first - CLEANUP_WINDOW, last + CLEANUP_WINDOW)
     stale = stale_ids(existing, events, str(config["plan_tag"]).strip())
 
+    tag = str(config["plan_tag"]).strip()
+    found = sum(1 for e in existing if (e.get("external_id") or "").startswith(f"{tag}-"))
+    print(f"\nIntervals has {len(existing)} events in the window; {found} belong to plan_tag {tag!r}.")
+
     if args.dry_run:
-        print(f"\n{len(events)} events would be pushed; {len(stale)} stale events would be deleted:")
+        print(f"{len(events)} events would be pushed; {len(stale)} stale events would be deleted:")
         for x in stale:
             print(f"  delete {x}")
         print("\nFirst event payload:")

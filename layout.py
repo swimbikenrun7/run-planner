@@ -4,19 +4,15 @@ Usage:
     python layout.py plans/plan_builder.xlsx
 
 Schedule holds a source plan in its own week convention (Config: source_week_end).
-This script maps it onto 7-day blocks ending on race_date and rearranges key sessions so:
-  - the race is on race_date and the long run is on the long_run day
-  - no two hard days are back-to-back (including across weeks)
-  - no hard day falls within taper_days of the race
-  - key sessions keep their source order and move as little as possible
-Easy runs and rest days fill the remaining days in their source order.
+This script maps it onto 7-day blocks ending on race_date, then places it backward from
+race day (see build_layout): taper first, then long runs, then other hard sessions,
+each sliding earlier only as far as the rules require. Easy runs and rest days fill in.
 Close the workbook in Excel before running: Excel locks open files.
 """
 
 import argparse
 import sys
 from datetime import timedelta
-from itertools import combinations
 
 from openpyxl.styles import Font, PatternFill
 
@@ -38,20 +34,12 @@ LAYOUT_HEADERS = ["date", "day", "week", "workout_id", "category", "name",
                   "source_day", "moved", "flag", "note"]
 
 
-def build_layout(config, library, schedule):
-    """Return a list of Layout rows (dicts), one per day from week 1 to race day."""
-    for key in ("race_date", "plan_tag"):
-        if blank(config.get(key)):
-            raise PlanError(f"Config is missing {key}")
+def read_schedule(config, library, schedule):
+    """Turn Schedule rows into items with a naive date (same position relative to week end)."""
     race_date = to_date(config["race_date"])
-    race_idx = race_date.weekday()
-    src_end = race_idx if blank(config.get("source_week_end")) else day_index(config["source_week_end"])
-    long_idx = None if blank(config.get("long_run")) else day_index(config["long_run"])
-    hard = hard_categories(config)
-    taper = taper_days(config)
+    src_end = race_date.weekday() if blank(config.get("source_week_end")) else day_index(config["source_week_end"])
 
-    # --- read the source plan into weeks[week][offset], offset 0 = last day of the week
-    errors, weeks = [], {}
+    errors, cells = [], {}
     for i, row in enumerate(schedule, start=2):
         try:
             week = int(row["week"])
@@ -63,100 +51,179 @@ def build_layout(config, library, schedule):
         if wid is not None and wid not in library:
             errors.append(f"Schedule row {i}: workout_id {wid!r} not in Library")
             continue
-        offset = (src_end - src_day) % 7
-        if offset in weeks.setdefault(week, {}):
+        offset = (src_end - src_day) % 7  # 0 = last day of the source week
+        if (week, offset) in cells:
             errors.append(f"Schedule row {i}: week {week} {row['day']} appears twice")
             continue
-        weeks[week][offset] = {
-            "wid": wid,
-            "category": category_of(library, wid) if wid else "rest",
-            "source_day": DAYS[src_day].title(),
-            "note": row.get("note"),
-            "naive": offset,
-        }
-    if not weeks and not errors:
+        cells[(week, offset)] = (wid, DAYS[src_day].title(), row.get("note"))
+    if not cells and not errors:
         errors.append("Schedule is empty")
     if errors:
         raise PlanError("\n".join(errors))
 
-    first_week, last_week = min(weeks), max(weeks)
-
-    def block_end(week):
-        return race_date - timedelta(weeks=last_week - week)
-
-    def date_of(week, offset):
-        return block_end(week) - timedelta(days=offset)
-
-    long_off = None if long_idx is None else (race_idx - long_idx) % 7
-    taper_window = {race_date - timedelta(days=k) for k in range(1, taper + 1)}
-
-    rows, hard_dates = [], set()
+    first_week = min(w for w, _ in cells)
+    last_week = max(w for w, _ in cells)
+    items = []
     for week in range(first_week, last_week + 1):
-        src = weeks.get(week, {})
-        flags = {}
-        # every day of the block gets an item; missing source days are rest
-        items = {off: src.get(off) or {"wid": None, "category": "rest", "source_day": DAYS[(src_end - off) % 7].title(),
-                                       "note": None, "naive": off}
-                 for off in range(7)}
-        chrono = list(range(6, -1, -1))  # offsets in date order
-        keys = [items[o] for o in chrono if items[o]["category"] in hard]
-
-        # pin the race and the long run
-        pinned, free = {}, []
-        for item in keys:
-            if item["category"] == "race" and week == last_week and 0 not in pinned:
-                pinned[0] = item
-            elif item["category"] == "long" and long_off is not None and long_off not in pinned:
-                pinned[long_off] = item
-            else:
-                free.append(item)
-        if long_off == 0 and any(i["category"] == "long" for i in free):
-            flags[0] = "long run day is race day"
-
-        # neighbours outside this week that spacing must respect
-        neighbour = set(hard_dates)
-        nxt = weeks.get(week + 1, {})
-        if long_off is not None and any(i["category"] == "long" for i in nxt.values() if i):
-            neighbour.add(date_of(week + 1, long_off))
-
-        avail = [o for o in chrono if o not in pinned]
-        best = None
-        for choice in combinations(avail, len(free)):  # preserves source order
-            dates = {date_of(week, o) for o in list(pinned) + list(choice)}
-            all_hard = sorted(dates | neighbour)
-            adjacent = sum(1 for a, b in zip(all_hard, all_hard[1:]) if (b - a).days == 1)
-            in_taper = sum(1 for d in dates if d in taper_window and d != race_date)
-            displacement = sum(abs(o - item["naive"]) for o, item in zip(choice, free))
-            gaps = [(b - a).days for a, b in zip(all_hard, all_hard[1:])]
-            score = (adjacent + in_taper, displacement, -min(gaps, default=7))
-            if best is None or score < best[0]:
-                best = (score, choice)
-
-        placed = dict(pinned)
-        placed.update(zip(best[1], free))
-        hard_dates |= {date_of(week, o) for o in placed}
-
-        # easy runs and rest days fill what's left, in source order
-        fillers = [items[o] for o in chrono if items[o]["category"] not in hard]
-        open_slots = [o for o in chrono if o not in placed]
-        placed.update(zip(open_slots, fillers))
-
-        for off in chrono:
-            item = placed[off]
-            d = date_of(week, off)
-            wid = item["wid"]
-            rows.append({
-                "date": d,
-                "day": d.strftime("%a"),
-                "week": week,
-                "workout_id": wid,
-                "category": item["category"],
-                "name": str(library[wid].get("name") or wid) if wid else "Rest",
-                "source_day": item["source_day"],
-                "moved": "yes" if off != item["naive"] else "",
-                "flag": flags.get(off, ""),
-                "note": item["note"],
+        for offset in range(6, -1, -1):
+            wid, src_day, note = cells.get((week, offset), (None, DAYS[(src_end - offset) % 7].title(), None))
+            items.append({
+                "wid": wid,
+                "category": category_of(library, wid) if wid else "rest",
+                "source_day": src_day,
+                "note": note,
+                "naive": race_date - timedelta(weeks=last_week - week, days=offset),
             })
+    return items, last_week
+
+
+def build_layout(config, library, schedule):
+    """Place the plan backward from race day. Returns one Layout row per day.
+
+    Order of work, each step respecting everything placed before it:
+      1. the race on race_date, with taper_days of no hard sessions before it
+      2. long runs on the long_run weekday of their week (or earlier if that day is taken)
+      3. other hard sessions, latest first, each on the latest date that is on or before
+         its source date, before the next session in the plan, and not next to any
+         placed hard day. A session that doesn't fit slides earlier, and pushes the
+         sessions before it earlier too. If that runs off the start of the plan, the
+         sessions at the start get pushed later instead, only as far as needed.
+      4. easy runs and rest days stay on their source date when it's free; the ones
+         displaced fill the remaining days in their source order.
+    """
+    for key in ("race_date", "plan_tag"):
+        if blank(config.get(key)):
+            raise PlanError(f"Config is missing {key}")
+    race_date = to_date(config["race_date"])
+    long_idx = None if blank(config.get("long_run")) else day_index(config["long_run"])
+    hard = hard_categories(config)
+    taper = taper_days(config)
+    items, last_week = read_schedule(config, library, schedule)
+    plan_start = items[0]["naive"]
+
+    occupied = {}  # date -> item, hard sessions only
+    flags = {}
+
+    one = timedelta(days=1)
+    last_hard_day = race_date - timedelta(days=taper + 1)
+
+    def fits(d):
+        return (plan_start <= d <= last_hard_day and d not in occupied
+                and d - one not in occupied and d + one not in occupied)
+
+    def latest(start, ok=lambda d: True):
+        """Latest date on or before start that fits, or None if it would leave the plan."""
+        d = start
+        while d >= plan_start:
+            if fits(d) and ok(d):
+                return d
+            d -= one
+        return None
+
+    def earliest(start, ok=lambda d: True):
+        """Earliest date on or after start that fits, or None if there's no room before the taper."""
+        d = max(start, plan_start)
+        while d <= last_hard_day:
+            if fits(d) and ok(d):
+                return d
+            d += one
+        return None
+
+    def squeeze(item):
+        """No legal day left: put it on the latest free day before the taper (or, failing
+        that, inside it) and flag it."""
+        candidates = [plan_start + timedelta(days=k) for k in range((race_date - plan_start).days)]
+        before = [d for d in candidates if d <= last_hard_day]
+        after = [d for d in candidates if d > last_hard_day]
+        free = [d for d in before[::-1] + after if d not in occupied]
+        flags[id(item)] = "no legal day left: plan has too many hard sessions"
+        return free[0]
+
+    by_naive_desc = sorted(items, key=lambda i: i["naive"], reverse=True)
+    races = [i for i in by_naive_desc if i["category"] == "race"]
+    longs = [i for i in by_naive_desc if i["category"] == "long" and long_idx is not None]
+    others = [i for i in by_naive_desc if i["category"] in hard and i not in races and i not in longs]
+
+    # 1. race (extra race rows are treated like any other hard session)
+    for n, item in enumerate(races):
+        if n == 0:
+            occupied[race_date] = item
+        else:
+            others.append(item)
+            flags[id(item)] = "more than one race in Schedule"
+    others.sort(key=lambda i: i["naive"], reverse=True)
+
+    def target(item):
+        """Where a session wants to be: its source date, or for a long run, the
+        long-run weekday in the same week block."""
+        if item["category"] != "long" or long_idx is None:
+            return item["naive"]
+        block_end = race_date - timedelta(weeks=(race_date - item["naive"]).days // 7)
+        return block_end - timedelta(days=(race_date.weekday() - long_idx) % 7)
+
+    def place(group, ok):
+        """Backward pass, then a forward pass that only matters if the backward pass ran out of plan.
+
+        Backward: latest first, each on the latest legal day on or before both its source date
+        and the next session's day, so a session that doesn't fit pushes earlier ones earlier.
+        Forward: earliest first, each kept on its backward day unless something before it was
+        pushed later (which only happens when sessions ran off the start of the plan).
+        """
+        backward, bound = {}, last_hard_day
+        for item in group:  # latest first
+            d = latest(min(target(item), bound), ok)
+            backward[id(item)] = d if d is not None else plan_start
+            if d is not None:
+                occupied[d] = item
+                bound = d - one
+            else:
+                bound = plan_start - one
+        for d in [d for d, i in occupied.items() if i in group]:
+            del occupied[d]
+        prev = plan_start - one
+        for item in reversed(group):  # earliest first
+            d = earliest(max(backward[id(item)], prev + one), ok)
+            if d is None:
+                d = squeeze(item)
+            occupied[d] = item
+            prev = d
+
+    # 2. long runs on the long-run weekday, then 3. everything else that's hard
+    place(longs, lambda d: d.weekday() == long_idx)
+    place(others, lambda d: True)
+
+    # 4. easy runs and rest days
+    days = [plan_start + timedelta(days=k) for k in range((race_date - plan_start).days + 1)]
+    placed = dict(occupied)
+    displaced = []
+    for item in (i for i in items if i["category"] not in hard):
+        if item["naive"] not in placed:
+            placed[item["naive"]] = item
+        else:
+            displaced.append(item)
+    open_days = [d for d in days if d not in placed]
+    for d, item in zip(open_days, displaced):
+        placed[d] = item
+    for d in open_days[len(displaced):]:
+        placed[d] = {"wid": None, "category": "rest", "source_day": "", "note": None, "naive": d}
+
+    rows = []
+    for d in days:
+        item = placed[d]
+        wid = item["wid"]
+        flag = flags.get(id(item), "")
+        rows.append({
+            "date": d,
+            "day": d.strftime("%a"),
+            "week": last_week - (race_date - d).days // 7,
+            "workout_id": wid,
+            "category": item["category"],
+            "name": str(library[wid].get("name") or wid) if wid else "Rest",
+            "source_day": item["source_day"],
+            "moved": "yes" if wid and d != item["naive"] else "",
+            "flag": flag,
+            "note": item["note"],
+        })
 
     # final check across the whole plan
     by_date = {r["date"]: r for r in rows}

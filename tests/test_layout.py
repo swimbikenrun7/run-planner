@@ -1,3 +1,4 @@
+import random
 from datetime import date, timedelta
 
 from layout import build_layout
@@ -89,3 +90,32 @@ def test_impossible_week_is_flagged_not_dropped():
     rows = build_layout(config(source_week_end="thu"), LIBRARY, sched)
     assert any(r["flag"] for r in rows)
     assert sum(1 for r in rows if r["workout_id"]) == 7
+
+
+def test_no_room_before_taper_cascades_into_prior_week():
+    # Sunday long run + 2-day taper before a Thursday race leaves Mon as the last hard day,
+    # which touches the long run. So race week's intervals go to the prior Fri (two days
+    # before the long run), and the Thu tempo already there gets pushed earlier.
+    sched = (week(1, Fri="EASY", Sat="LONG", Sun="EASY", Mon="EASY", Tue="INT", Wed="EASY", Thu="TEMPO")
+             + week(2, Fri="EASY", Sat="LONG", Sun="EASY", Mon="EASY", Tue="INT", Wed="EASY", Thu="TEMPO")
+             + week(3, Fri="EASY", Sat="LONG", Sun="EASY", Mon="INT", Tue="EASY", Wed="EASY", Thu="RACE"))
+    rows = build_layout(config(source_week_end="thu", long_run="sun"), LIBRARY, sched)
+    d = by_date(rows)
+    assert d[date(2026, 11, 22)]["workout_id"] == "LONG"   # Sun before the race
+    assert d[date(2026, 11, 20)]["workout_id"] == "INT"    # race-week intervals, prior Fri
+    assert d[date(2026, 11, 18)]["workout_id"] == "TEMPO"  # pushed from Thu to Wed
+    assert_rules_hold(rows)
+
+
+def test_scrambled_plans_always_resolve():
+    base = (week(1, Fri="EASY", Sat="LONG", Sun="EASY", Mon="EASY", Tue="INT", Wed="EASY", Thu="TEMPO")
+            + week(2, Fri="EASY", Sat="LONG", Sun="EASY", Mon="EASY", Tue="INT", Wed="EASY", Thu="TEMPO")
+            + week(3, Fri="EASY", Sat="LONG", Sun="EASY", Mon="EASY", Tue="INT", Wed="EASY", Thu="TEMPO")
+            + week(4, Fri="EASY", Sat="LONG", Sun="EASY", Mon="INT", Tue="EASY", Wed="EASY", Thu="RACE"))
+    for seed in range(200):
+        ids = [r["workout_id"] for r in base]
+        random.Random(seed).shuffle(ids)
+        sched = [dict(r, workout_id=w) for r, w in zip(base, ids)]
+        rows = build_layout(config(source_week_end="thu"), LIBRARY, sched)
+        assert sorted(r["workout_id"] or "" for r in rows) == sorted(ids), seed
+        assert_rules_hold(rows)
