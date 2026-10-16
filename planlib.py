@@ -95,3 +95,52 @@ def rule_violations(entries, race_date, hard, taper):
         if d in taper_window:
             problems.append((d, f"hard day within {taper} days of the race"))
     return problems
+
+
+DEFAULT_LONG_RUN_GAP = 5
+ROLES = {"long", "quality", "fixed", "easy"}
+
+
+def long_run_gap(config):
+    """A long run must be more than this many days before the race."""
+    raw = config.get("long_run_gap")
+    return DEFAULT_LONG_RUN_GAP if blank(raw) else int(raw)
+
+
+def yes(value):
+    return str(value or "").strip().lower() in {"yes", "y", "true", "1"}
+
+
+def last_used_row(ws):
+    """Last row with any content (Excel often formats thousands of empty rows below data)."""
+    for r in range(ws.max_row, 0, -1):
+        if any(c.value not in (None, "") for c in ws[r]):
+            return r
+    return 0
+
+
+def read_week(rows, library):
+    """Week tab -> {weekday index: (role, workout_id or None)}. Every weekday must appear once."""
+    week, errors = {}, []
+    for r in rows:
+        try:
+            d = day_index(r.get("day"))
+        except PlanError as e:
+            errors.append(f"Week tab: {e}")
+            continue
+        role = str(r.get("role") or "easy").strip().lower()
+        wid = None if blank(r.get("workout_id")) else str(r["workout_id"]).strip()
+        if role not in ROLES:
+            errors.append(f"Week tab {DAYS[d].title()}: role {role!r} not one of {', '.join(sorted(ROLES))}")
+        elif role == "fixed" and (wid is None or wid not in library):
+            errors.append(f"Week tab {DAYS[d].title()}: fixed day needs a workout_id that's in Library")
+        if d in week:
+            errors.append(f"Week tab: {DAYS[d].title()} appears twice")
+        week[d] = (role, wid)
+    for d in range(7):
+        week.setdefault(d, ("easy", None))
+    if sum(1 for role, _ in week.values() if role == "long") > 1:
+        errors.append("Week tab: only one long day allowed")
+    if errors:
+        raise PlanError("\n".join(errors))
+    return week

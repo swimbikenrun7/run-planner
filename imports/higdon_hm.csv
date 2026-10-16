@@ -1,0 +1,85 @@
+week,day,workout_id,category,name,workout_text,note
+1,Mon,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+1,Tue,HILLS-6x90,hills,Hills 6x90s,Warmup / - Press lap {WU} 10m / Hills 6x / - Uphill hard 90s / - Press lap Jog down {RECOVERY} / Cooldown / - Press lap {WU} 10m,
+1,Wed,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+1,Thu,TEMPO-PROG-40,tempo,Tempo 40 min,Warmup / - Press lap {WU} 10m / Main Set / - 5m {HM} / - 10m {10K} / - 5m {HM} / Cooldown / - Press lap {WU} 10m,
+1,Fri,,,,,Rest
+1,Sat,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+1,Sun,LONG-90-31,long,Long 90 min 3/1,- Press lap {LONG} 67m30s / - 22m30s {M},
+2,Mon,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+2,Tue,INT-7x400-5K,interval,5K pace 7x400,Warmup / - Press lap {WU} 10m / Main Set 7x / - 400mtr {5K} / - 90s {RECOVERY} / Cooldown / - Press lap {WU} 10m,
+2,Wed,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+2,Thu,TEMPO-PROG-45,tempo,Tempo 45 min,Warmup / - Press lap {WU} 10m / Main Set / - 5m {HM} / - 15m {10K} / - 5m {HM} / Cooldown / - Press lap {WU} 10m,
+2,Fri,,,,,Rest
+2,Sat,PACE-3MI,tempo,HM pace 3mi,Warmup / - Press lap {WU} 10m / Main Set / - 3mi {HM} / Cooldown / - Press lap {WU} 10m,
+2,Sun,LONG-90,long,Long 90 min,- Press lap 80% Pace 90m,
+3,Mon,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+3,Tue,HILLS-7x90,hills,Hills 7x90s,Warmup / - Press lap {WU} 10m / Hills 7x / - Uphill hard 90s / - Press lap Jog down {RECOVERY} / Cooldown / - Press lap {WU} 10m,
+3,Wed,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+3,Thu,TEMPO-PROG-30,tempo,Tempo 30 min,Warmup / - Press lap {WU} 10m / Main Set / - 2m {HM} / - 6m {10K} / - 2m {HM} / Cooldown / - Press lap {WU} 10m,
+3,Fri,,,,,Rest or easy run
+3,Sat,,,,,Rest
+3,Sun,TUNEUP-5K,tuneup,5K tune-up race,- Press lap {5K} 5km,
+4,Mon,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+4,Tue,INT-8x400-5K,interval,5K pace 8x400,Warmup / - Press lap {WU} 10m / Main Set 8x / - 400mtr {5K} / - 90s {RECOVERY} / Cooldown / - Press lap {WU} 10m,
+4,Wed,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+4,Thu,TEMPO-PROG-40,tempo,Tempo 40 min,Warmup / - Press lap {WU} 10m / Main Set / - 5m {HM} / - 10m {10K} / - 5m {HM} / Cooldown / - Press lap {WU} 10m,
+4,Fri,,,,,Rest
+4,Sat,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+4,Sun,LONG-90-31,long,Long 90 min 3/1,- Press lap {LONG} 67m30s / - 22m30s {M},
+5,Mon,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+5,Tue,HILLS-8x90,hills,Hills 8x90s,Warmup / - Press lap {WU} 10m / Hills 8x / - Uphill hard 90s / - Press lap Jog down {RECOVERY} / Cooldown / - Press lap {WU} 10m,
+5,Wed,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+5,Thu,TEMPO-PROG-45,tempo,Tempo 45 min,Warmup / - Press lap {WU} 10m / Main Set / - 5m {HM} / - 15m {10K} / - 5m {HM} / Cooldown / - Press lap {WU} 10m,
+5,Fri,,,,,Rest
+5,Sat,PACE-3MI,tempo,HM pace 3mi,Warmup / - Press lap {WU} 10m / Main Set / - 3mi {HM} / Cooldown / - Press lap {WU} 10m,
+5,Sun,LONG-90,long,Long 90 min,- Press lap 80% Pace 90m,
+6,Mon,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+6,Tue,INT-8x400-5K,interval,5K pace 8x400,Warmup / - Press lap {WU} 10m / Main Set 8x / - 400mtr {5K} / - 90s {RECOVERY} / Cooldown / - Press lap {WU} 10m,
+6,Wed,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+6,Thu,TEMPO-PROG-30,tempo,Tempo 30 min,Warmup / - Press lap {WU} 10m / Main Set / - 2m {HM} / - 6m {10K} / - 2m {HM} / Cooldown / - Press lap {WU} 10m,
+6,Fri,,,,,Rest or easy run
+6,Sat,,,,,Rest
+6,Sun,TUNEUP-10K,tuneup,10K tune-up race,- Press lap {10K} 10km,
+7,Mon,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+7,Tue,INT-4x800-10K,interval,10K pace 4x800,Warmup / - Press lap {WU} 10m / Main Set 4x / - 800mtr {10K} / - 2m {RECOVERY} / Cooldown / - Press lap {WU} 10m,
+7,Wed,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+7,Thu,TEMPO-PROG-45,tempo,Tempo 45 min,Warmup / - Press lap {WU} 10m / Main Set / - 5m {HM} / - 15m {10K} / - 5m {HM} / Cooldown / - Press lap {WU} 10m,
+7,Fri,,,,,Rest
+7,Sat,PACE-4MI,tempo,HM pace 4mi,Warmup / - Press lap {WU} 10m / Main Set / - 4mi {HM} / Cooldown / - Press lap {WU} 10m,
+7,Sun,LONG-105-31,long,Long 1:45 3/1,- Press lap {LONG} 78m45s / - 26m15s {M},
+8,Mon,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+8,Tue,INT-3x1600-HM,interval,HM pace 3x1600,Warmup / - Press lap {WU} 10m / Main Set 3x / - 1600mtr {HM} / - 3m {RECOVERY} / Cooldown / - Press lap {WU} 10m,
+8,Wed,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+8,Thu,TEMPO-PROG-50,tempo,Tempo 50 min,Warmup / - Press lap {WU} 10m / Main Set / - 5m {HM} / - 20m {10K} / - 5m {HM} / Cooldown / - Press lap {WU} 10m,
+8,Fri,,,,,Rest
+8,Sat,PACE-5MI,tempo,HM pace 5mi,Warmup / - Press lap {WU} 10m / Main Set / - 5mi {HM} / Cooldown / - Press lap {WU} 10m,
+8,Sun,LONG-105,long,Long 1:45,- Press lap 80% Pace 105m,
+9,Mon,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+9,Tue,INT-5x800-10K,interval,10K pace 5x800,Warmup / - Press lap {WU} 10m / Main Set 5x / - 800mtr {10K} / - 2m {RECOVERY} / Cooldown / - Press lap {WU} 10m,
+9,Wed,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+9,Thu,TEMPO-PROG-30,tempo,Tempo 30 min,Warmup / - Press lap {WU} 10m / Main Set / - 2m {HM} / - 6m {10K} / - 2m {HM} / Cooldown / - Press lap {WU} 10m,
+9,Fri,,,,,Rest or easy run
+9,Sat,,,,,Rest
+9,Sun,TUNEUP-15K,tuneup,15K tune-up race,- Press lap {HM-10s} 15km,
+10,Mon,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+10,Tue,INT-4x1600-HM,interval,HM pace 4x1600,Warmup / - Press lap {WU} 10m / Main Set 4x / - 1600mtr {HM} / - 3m {RECOVERY} / Cooldown / - Press lap {WU} 10m,
+10,Wed,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+10,Thu,TEMPO-PROG-55,tempo,Tempo 55 min,Warmup / - Press lap {WU} 15m / Main Set / - 5m {HM} / - 20m {10K} / - 5m {HM} / Cooldown / - Press lap {WU} 10m,
+10,Fri,,,,,Rest
+10,Sat,PACE-5MI,tempo,HM pace 5mi,Warmup / - Press lap {WU} 10m / Main Set / - 5mi {HM} / Cooldown / - Press lap {WU} 10m,
+10,Sun,LONG-120-31,long,Long 2:00 3/1,- Press lap {LONG} 90m / - 30m {M},
+11,Mon,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+11,Tue,INT-6x800-10K,interval,10K pace 6x800,Warmup / - Press lap {WU} 10m / Main Set 6x / - 800mtr {10K} / - 2m {RECOVERY} / Cooldown / - Press lap {WU} 10m,
+11,Wed,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+11,Thu,TEMPO-PROG-60,tempo,Tempo 60 min,Warmup / - Press lap {WU} 15m / Main Set / - 5m {HM} / - 25m {10K} / - 5m {HM} / Cooldown / - Press lap {WU} 10m,
+11,Fri,,,,,Rest
+11,Sat,PACE-3MI,tempo,HM pace 3mi,Warmup / - Press lap {WU} 10m / Main Set / - 3mi {HM} / Cooldown / - Press lap {WU} 10m,
+11,Sun,LONG-120,long,Long 2:00,- Press lap {LONG} 120m,
+12,Mon,EASY-3MI,easy,Easy 3mi,- Press lap 80% Pace 3mi,
+12,Tue,INT-6x400-5K,interval,5K pace 6x400,Warmup / - Press lap {WU} 10m / Main Set 6x / - 400mtr {5K} / - 90s {RECOVERY} / Cooldown / - Press lap {WU} 10m,
+12,Wed,EASY-2MI,easy,Easy 2mi,- Press lap {E} 2mi,
+12,Thu,TEMPO-PROG-30,tempo,Tempo 30 min,Warmup / - Press lap {WU} 10m / Main Set / - 2m {HM} / - 6m {10K} / - 2m {HM} / Cooldown / - Press lap {WU} 10m,
+12,Fri,,,,,Rest
+12,Sat,,,,,Rest
+12,Sun,RACE,race,Half Marathon,,

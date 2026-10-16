@@ -1,121 +1,124 @@
-import random
 from datetime import date, timedelta
 
-from layout import build_layout
+import pytest
 
-RACE = date(2026, 11, 26)  # a Thursday
+from layout import Context, future_hard, layout_rows, place, plan_items, selected_plan, suggest, violations
+from planlib import PlanError
+
+RACE = date(2027, 5, 2)  # a Sunday
+TODAY = date(2026, 10, 16)
+HARD = {"interval", "tempo", "hills", "long", "tuneup", "race"}
 LIBRARY = {
     "EASY": {"category": "easy", "name": "Easy"},
+    "GROUP": {"category": "easy", "name": "Group run"},
     "LONG": {"category": "long", "name": "Long"},
     "INT": {"category": "interval", "name": "Int"},
     "TEMPO": {"category": "tempo", "name": "Tempo"},
+    "PACE": {"category": "tempo", "name": "HM pace"},
+    "TUNE": {"category": "tuneup", "name": "5K race"},
     "RACE": {"category": "race", "name": "Race"},
 }
-HARD = {"interval", "tempo", "long", "race"}
+DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 
-def config(**overrides):
-    base = {"race_date": RACE, "plan_tag": "t", "long_run": "sat",
-            "hard_categories": "interval, tempo, long, race", "taper_days": 2}
-    base.update(overrides)
-    return base
+def week_tpl(**roles):
+    """week_tpl(sun='long', tue='quality', thu=('fixed', 'GROUP'))"""
+    out = {d: ("easy", None) for d in range(7)}
+    for name, role in roles.items():
+        d = DAY_NAMES.index(name.title())
+        out[d] = role if isinstance(role, tuple) else (role, None)
+    return out
 
 
-def week(n, **days):
-    return [{"week": n, "day": d, "workout_id": wid} for d, wid in days.items()]
+def rows_for(weeks):
+    """weeks: list of 7-item lists Mon..Sun of workout ids (None = rest)."""
+    return [{"week": w, "day": DAY_NAMES[d], "workout_id": wid}
+            for w, days in enumerate(weeks, start=1) for d, wid in enumerate(days)]
 
 
-def by_date(rows):
-    return {r["date"]: r for r in rows}
+def ctx_for(weeks, today=TODAY, gap=5, taper=2):
+    items, last = plan_items(RACE, 6, LIBRARY, rows_for(weeks))  # weeks end Sunday
+    return Context(RACE, HARD, taper, gap, LIBRARY, today, items, last)
 
 
-def hard_dates(rows):
-    return sorted(r["date"] for r in rows if r["category"] in HARD)
+HIGDON_WEEK = ["EASY", "INT", "EASY", "TEMPO", None, "PACE", "LONG"]
+RACE_WEEK = ["EASY", "INT", "EASY", "EASY", None, None, "RACE"]
+MY_WEEK = week_tpl(sun="long", tue="quality", thu=("fixed", "GROUP"), fri="quality")
 
 
-def assert_rules_hold(rows):
-    hd = hard_dates(rows)
-    assert all((b - a).days > 1 for a, b in zip(hd, hd[1:])), hd
-    assert not any(r["flag"] for r in rows)
+def by_date(placed):
+    return {d: i["wid"] for d, i in placed.items()}
 
 
-def test_plan_already_in_target_convention_is_unchanged():
-    # Fri-Thu weeks, long Sat, intervals Tue/Thu: nothing should move
-    sched = (week(1, Fri="EASY", Sat="LONG", Sun="EASY", Mon="EASY", Tue="INT", Wed="EASY", Thu="TEMPO")
-             + week(2, Fri="EASY", Sat="LONG", Sun="EASY", Mon="INT", Tue="EASY", Wed="EASY", Thu="RACE"))
-    rows = build_layout(config(source_week_end="thu"), LIBRARY, sched)
-    assert not any(r["moved"] for r in rows)
-    assert_rules_hold(rows)
+def test_plan_that_fits_lands_on_its_days():
+    ctx = ctx_for([["EASY", "INT", "EASY", "TEMPO", None, "EASY", "LONG"], RACE_WEEK])
+    placed, unplaced = place(ctx, week_tpl(sun="long", tue="quality", thu="quality"), False)
+    assert not future_hard(ctx, unplaced)
+    assert not violations(ctx, placed, False)
+    wk1 = RACE - timedelta(days=13)  # Mon of week 1
+    assert by_date(placed)[wk1 + timedelta(days=1)] == "INT"
+    assert by_date(placed)[wk1 + timedelta(days=6)] == "LONG"
 
 
-def test_sunday_plan_rearranged_for_thursday_race_and_saturday_long_run():
-    sched = (week(1, Tue="INT", Wed="EASY", Thu="TEMPO", Sat="EASY", Sun="LONG")
-             + week(2, Tue="INT", Wed="EASY", Thu="TEMPO", Sat="EASY", Sun="LONG")
-             + week(3, Tue="INT", Thu="EASY", Sun="RACE"))
-    rows = build_layout(config(source_week_end="sun"), LIBRARY, sched)
-    d = by_date(rows)
-    assert d[RACE]["workout_id"] == "RACE"
-    for r in rows:
-        if r["workout_id"] == "LONG":
-            assert r["day"] == "Sat"
-    assert_rules_hold(rows)
-    # source order kept inside each week: INT before TEMPO
-    wk1 = [r["workout_id"] for r in rows if r["week"] == 1 and r["workout_id"] in ("INT", "TEMPO")]
-    assert wk1 == ["INT", "TEMPO"]
-    # every workout survives: 3 hard + 2 easy per week in weeks 1-2
-    assert sum(1 for r in rows if r["week"] == 1 and r["workout_id"]) == 5
+def test_fixed_day_always_gets_its_workout():
+    ctx = ctx_for([HIGDON_WEEK, RACE_WEEK])
+    placed, _ = place(ctx, MY_WEEK, False)
+    thursdays = [d for d in ctx.days if d.weekday() == 3]
+    assert all(placed[d]["wid"] == "GROUP" for d in thursdays)
 
 
-def test_hard_session_pulled_out_of_taper_window():
-    # source puts intervals the day before the race
-    sched = week(1, Fri="EASY", Sat="EASY", Sun="EASY", Mon="EASY", Tue="EASY", Wed="INT", Thu="RACE")
-    rows = build_layout(config(source_week_end="thu", long_run=None), LIBRARY, sched)
-    int_row = next(r for r in rows if r["workout_id"] == "INT")
-    assert int_row["date"] < RACE - timedelta(days=2)
-    assert int_row["moved"] == "yes"
-    assert_rules_hold(rows)
+def test_extra_hard_session_is_reported_not_crammed_in():
+    ctx = ctx_for([HIGDON_WEEK, RACE_WEEK])
+    placed, unplaced = place(ctx, MY_WEEK, False)
+    assert [i["wid"] for i, _ in future_hard(ctx, unplaced)] == ["PACE"]
+    assert not violations(ctx, placed, False)
 
 
-def test_spacing_respected_across_week_boundary():
-    # week 1 ends with TEMPO on Thu; week 2's INT sits on Fri in the source
-    sched = (week(1, Fri="EASY", Sat="LONG", Sun="EASY", Mon="EASY", Tue="INT", Wed="EASY", Thu="TEMPO")
-             + week(2, Fri="INT", Sat="EASY", Sun="EASY", Mon="EASY", Tue="EASY", Wed="EASY", Thu="RACE"))
-    rows = build_layout(config(source_week_end="thu", long_run=None), LIBRARY, sched)
-    assert_rules_hold(rows)
+def test_no_long_run_within_gap_of_race():
+    ctx = ctx_for([["EASY"] * 6 + ["LONG"], ["EASY", "EASY", "LONG", "EASY", None, None, "RACE"]])
+    placed, unplaced = place(ctx, week_tpl(wed="long"), False)
+    reasons = [why for i, why in unplaced if i["wid"] == "LONG"]
+    assert reasons == ["long run within 5 days of the race"]
 
 
-def test_impossible_week_is_flagged_not_dropped():
-    # five hard sessions can't fit in seven days without touching
-    sched = week(1, Fri="INT", Sat="LONG", Sun="INT", Mon="TEMPO", Tue="INT", Wed="EASY", Thu="RACE")
-    rows = build_layout(config(source_week_end="thu"), LIBRARY, sched)
-    assert any(r["flag"] for r in rows)
-    assert sum(1 for r in rows if r["workout_id"]) == 7
+def test_tuneup_race_takes_the_long_run_day():
+    ctx = ctx_for([["EASY", "INT", "EASY", "TEMPO", None, None, "TUNE"], RACE_WEEK])
+    placed, _ = place(ctx, week_tpl(sat="long", tue="quality", thu="quality"), False)
+    assert by_date(placed)[RACE - timedelta(days=8)] == "TUNE"  # Sat of week 1
 
 
-def test_no_room_before_taper_cascades_into_prior_week():
-    # Sunday long run + 2-day taper before a Thursday race leaves Mon as the last hard day,
-    # which touches the long run. So race week's intervals go to the prior Fri (two days
-    # before the long run), and the Thu tempo already there gets pushed earlier.
-    sched = (week(1, Fri="EASY", Sat="LONG", Sun="EASY", Mon="EASY", Tue="INT", Wed="EASY", Thu="TEMPO")
-             + week(2, Fri="EASY", Sat="LONG", Sun="EASY", Mon="EASY", Tue="INT", Wed="EASY", Thu="TEMPO")
-             + week(3, Fri="EASY", Sat="LONG", Sun="EASY", Mon="INT", Tue="EASY", Wed="EASY", Thu="RACE"))
-    rows = build_layout(config(source_week_end="thu", long_run="sun"), LIBRARY, sched)
-    d = by_date(rows)
-    assert d[date(2026, 11, 22)]["workout_id"] == "LONG"   # Sun before the race
-    assert d[date(2026, 11, 20)]["workout_id"] == "INT"    # race-week intervals, prior Fri
-    assert d[date(2026, 11, 18)]["workout_id"] == "TEMPO"  # pushed from Thu to Wed
-    assert_rules_hold(rows)
+def test_pre_long_session_allowed_only_when_switched_on():
+    ctx = ctx_for([HIGDON_WEEK, RACE_WEEK])
+    tpl = week_tpl(sun="long", tue="quality", thu="quality", sat="quality")
+    placed, unplaced = place(ctx, tpl, True)
+    assert not future_hard(ctx, unplaced) and not violations(ctx, placed, True)
+    assert by_date(placed)[RACE - timedelta(days=8)] == "PACE"
+    placed, unplaced = place(ctx, tpl, False)
+    assert any(i["wid"] == "PACE" for i, _ in unplaced)
 
 
-def test_scrambled_plans_always_resolve():
-    base = (week(1, Fri="EASY", Sat="LONG", Sun="EASY", Mon="EASY", Tue="INT", Wed="EASY", Thu="TEMPO")
-            + week(2, Fri="EASY", Sat="LONG", Sun="EASY", Mon="EASY", Tue="INT", Wed="EASY", Thu="TEMPO")
-            + week(3, Fri="EASY", Sat="LONG", Sun="EASY", Mon="EASY", Tue="INT", Wed="EASY", Thu="TEMPO")
-            + week(4, Fri="EASY", Sat="LONG", Sun="EASY", Mon="INT", Tue="EASY", Wed="EASY", Thu="RACE"))
-    for seed in range(200):
-        ids = [r["workout_id"] for r in base]
-        random.Random(seed).shuffle(ids)
-        sched = [dict(r, workout_id=w) for r, w in zip(base, ids)]
-        rows = build_layout(config(source_week_end="thu"), LIBRARY, sched)
-        assert sorted(r["workout_id"] or "" for r in rows) == sorted(ids), seed
-        assert_rules_hold(rows)
+def test_suggestions_offer_both_kinds_of_fix():
+    ctx = ctx_for([HIGDON_WEEK] * 3 + [RACE_WEEK])
+    picks = suggest(ctx, MY_WEEK, False, [5, 6])
+    assert len(picks[0]["missing"]) == 3  # your week as it is
+    fixes = [p for p in picks[1:] if not p["missing"]]
+    assert any(any("skips GROUP" in c for c in p["changes"]) for p in fixes)  # keep Sunday long
+    assert any(p["week"][5][0] == "long" and p["week"][3] == ("fixed", "GROUP") for p in fixes)
+
+
+def test_past_dates_are_flagged_and_not_counted():
+    ctx = ctx_for([HIGDON_WEEK, RACE_WEEK], today=RACE - timedelta(days=7))
+    placed, unplaced = place(ctx, MY_WEEK, False)
+    assert not future_hard(ctx, unplaced)  # week 1's leftover pace run is in the past
+    rows = layout_rows(ctx, placed, unplaced, False)
+    assert all(r["flag"].startswith("past") for r in rows if r["date"] and r["date"] < ctx.today)
+
+
+def test_plans_are_selected_by_name():
+    sheets = {"plans": [{"plan": "a", "source_week_end": "sun"}],
+              "schedule": [{"plan": "a", "week": 1, "day": "Mon", "workout_id": "EASY"},
+                           {"plan": "b", "week": 1, "day": "Mon", "workout_id": "INT"}]}
+    name, week_end, rows = selected_plan({"plan": "a"}, sheets)
+    assert (name, week_end, [r["workout_id"] for r in rows]) == ("a", 6, ["EASY"])
+    with pytest.raises(PlanError):
+        selected_plan({"plan": "b"}, sheets)  # not on the Plans tab

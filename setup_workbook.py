@@ -7,6 +7,8 @@ Safe to run more than once: it only adds what's missing.
   - a Paces tab (the pace table, keyed by convention name)
   - Config: threshold_pace (you fill in the value)
   - Config: 'hills' and 'tuneup' added to hard_categories
+  - a Week tab (your weekly structure), a Plans tab, and a plan column on Schedule
+  - Config: plan, long_run_gap, allow_pre_long
 Close the workbook in Excel first.
 """
 
@@ -15,6 +17,8 @@ import sys
 
 import openpyxl
 from openpyxl.styles import Font
+
+from planlib import DAYS, last_used_row, read_table, to_date
 
 # Daniels VDOT relationships, as % of threshold SPEED (Intervals.icu uses % of speed)
 PACES = [
@@ -37,8 +41,29 @@ ARIAL_BOLD = Font(name="Arial", bold=True)
 
 
 def config_rows(ws):
-    return {str(ws.cell(r, 1).value).strip(): r for r in range(2, ws.max_row + 1)
+    return {str(ws.cell(r, 1).value).strip(): r for r in range(2, last_used_row(ws) + 1)
             if ws.cell(r, 1).value is not None}
+
+
+def add_config(cfg, key, value, changes, note=""):
+    if key not in config_rows(cfg):
+        r = last_used_row(cfg) + 1
+        cfg.cell(r, 1, key).font = ARIAL
+        cfg.cell(r, 2, value).font = ARIAL
+        changes.append(f"added Config {key}" + (f" ({note})" if note else ""))
+
+
+def styled_sheet(wb, title, headers, rows, widths):
+    ws = wb.create_sheet(title)
+    ws.append(headers)
+    for row in rows:
+        ws.append(row)
+    for row in ws.iter_rows():
+        for c in row:
+            c.font = ARIAL_BOLD if c.row == 1 else ARIAL
+    for col, w in widths.items():
+        ws.column_dimensions[col].width = w
+    return ws
 
 
 def setup(wb):
@@ -59,11 +84,7 @@ def setup(wb):
 
     cfg = wb["Config"]
     rows = config_rows(cfg)
-    if "threshold_pace" not in rows:
-        r = cfg.max_row + 1
-        cfg.cell(r, 1, "threshold_pace").font = ARIAL
-        cfg.cell(r, 2, None).font = ARIAL
-        changes.append("added Config threshold_pace (fill in, e.g. 7:30/mi)")
+    add_config(cfg, "threshold_pace", None, changes, "fill in, e.g. 7:30/mi")
 
     if "hard_categories" in rows:
         cell = cfg.cell(rows["hard_categories"], 2)
@@ -73,6 +94,42 @@ def setup(wb):
             cell.value = ", ".join(cats + missing)
             changes.append(f"added {', '.join(missing)} to hard_categories")
 
+    config = {str(cfg.cell(r, 1).value).strip(): cfg.cell(r, 2).value
+              for r in range(2, last_used_row(cfg) + 1) if cfg.cell(r, 1).value}
+
+    if "Week" not in wb.sheetnames:
+        long_day = str(config.get("long_run") or "sun").strip().lower()[:3]
+        roles = {d: "easy" for d in DAYS}
+        roles.update({"tue": "quality", "thu": "quality", long_day: "long"})
+        styled_sheet(wb, "Week", ["day", "role", "workout_id"],
+                     [[d.title(), roles[d], None] for d in DAYS], {"A": 6, "B": 10, "C": 16})
+        changes.append(f"added Week tab (long run {long_day.title()}, quality Tue/Thu): edit to fit your week")
+
+    sched = wb["Schedule"]
+    headers = [str(c.value or "").strip().lower() for c in sched[1]]
+    if "plan" not in headers:
+        sched.insert_cols(1)
+        sched.cell(1, 1, "plan").font = ARIAL_BOLD
+        for r in range(2, last_used_row(sched) + 1):
+            if any(c.value not in (None, "") for c in sched[r][1:]):
+                sched.cell(r, 1, "legacy").font = ARIAL
+        changes.append("added plan column to Schedule (existing rows named 'legacy')")
+
+    if "Plans" not in wb.sheetnames:
+        has_rows = any(str(r.get("plan") or "").strip() == "legacy" for r in read_table(sched))
+        week_end = config.get("source_week_end")
+        if not week_end and config.get("race_date"):
+            week_end = DAYS[to_date(config["race_date"]).weekday()]
+        styled_sheet(wb, "Plans", ["plan", "source_week_end", "notes"],
+                     [["legacy", week_end, "rows that were on Schedule before plans had names"]]
+                     if has_rows else [], {"A": 26, "B": 16, "C": 50})
+        changes.append("added Plans tab")
+        add_config(cfg, "plan", "legacy" if has_rows else None, changes, "the plan to lay out")
+
+    add_config(cfg, "plan", None, changes, "the plan to lay out")
+    add_config(cfg, "taper_days", 2, changes)
+    add_config(cfg, "long_run_gap", 5, changes, "no long run within this many days of the race")
+    add_config(cfg, "allow_pre_long", "no", changes)
     return changes
 
 

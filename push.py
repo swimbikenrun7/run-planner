@@ -14,7 +14,7 @@ import argparse
 import json
 import os
 import sys
-from datetime import timedelta
+from datetime import date, timedelta
 
 import requests
 from dotenv import load_dotenv
@@ -28,6 +28,7 @@ from planlib import (
     rule_violations,
     taper_days,
     to_date,
+    yes,
 )
 
 API_BASE = "https://intervals.icu/api/v1"
@@ -53,8 +54,12 @@ def to_intervals_text(cell_text):
     return "\n".join(out)
 
 
-def build_events(config, library, layout):
-    """Validate the Layout rows and return the Intervals.icu event list. Raises PlanError."""
+def build_events(config, library, layout, today=None):
+    """Validate the Layout rows and return the Intervals.icu event list. Raises PlanError.
+
+    Rows without a date (sessions layout couldn't place) and dates before today are skipped.
+    """
+    today = today or date.today()
     if blank(config.get("plan_tag")):
         raise PlanError("Config is missing plan_tag")
     plan_tag = str(config["plan_tag"]).strip()
@@ -62,13 +67,15 @@ def build_events(config, library, layout):
     errors, events, seen = [], [], {}
     for i, row in enumerate(layout, start=2):
         wid = row.get("workout_id")
-        if blank(wid):
-            continue  # rest day
+        if blank(wid) or blank(row.get("date")):
+            continue  # rest day, or a session layout couldn't place
         wid = str(wid).strip()
         try:
             d = to_date(row["date"])
         except (TypeError, ValueError) as e:
             errors.append(f"Layout row {i}: bad date ({e})")
+            continue
+        if d < today:
             continue
         if wid not in library:
             errors.append(f"Layout row {i}: workout_id {wid!r} not in Library")
@@ -104,20 +111,38 @@ def layout_warnings(config, library, layout):
     entries = []
     for row in layout:
         wid = row.get("workout_id")
-        if not blank(wid) and str(wid).strip() in library:
+        if not blank(wid) and not blank(row.get("date")) and str(wid).strip() in library:
             entries.append((to_date(row["date"]), category_of(library, str(wid).strip())))
-    return rule_violations(entries, to_date(config["race_date"]),
-                           hard_categories(config), taper_days(config))
+    problems = rule_violations(entries, to_date(config["race_date"]),
+                               hard_categories(config), taper_days(config))
+    if yes(config.get("allow_pre_long")):
+        cats = dict(entries)
+        problems = [(d, m) for d, m in problems
+                    if not (m.startswith("back-to-back") and cats.get(d) == "long")]
+    return problems
 
 
-def stale_ids(existing, events, plan_tag):
-    """external_ids of this plan's events in Intervals that the new plan no longer has."""
+def stale_ids(existing, events, plan_tag, today=None):
+    """external_ids of this plan's future events in Intervals that the new plan no longer has.
+
+    Past events are never deleted: they're history, even if the plan has changed since.
+    """
+    today = today or date.today()
     keep = {e["external_id"] for e in events}
     prefix = f"{plan_tag}-"
-    return sorted(
-        e["external_id"] for e in existing
-        if (e.get("external_id") or "").startswith(prefix) and e["external_id"] not in keep
-    )
+    out = []
+    for e in existing:
+        xid = e.get("external_id") or ""
+        if not xid.startswith(prefix) or xid in keep:
+            continue
+        start = str(e.get("start_date_local") or xid[len(prefix):])[:10]
+        try:
+            if date.fromisoformat(start) < today:
+                continue
+        except ValueError:
+            pass
+        out.append(xid)
+    return sorted(out)
 
 
 # ---------- talking to Intervals.icu ----------
@@ -184,7 +209,7 @@ def main(argv=None):
         print("Set INTERVALS_ATHLETE_ID and INTERVALS_API_KEY in .env", file=sys.stderr)
         return 1
 
-    first = to_date(events[0]["start_date_local"])
+    first = date.today()
     last = to_date(config["race_date"])
     existing = client.list_events(first - CLEANUP_WINDOW, last + CLEANUP_WINDOW)
     stale = stale_ids(existing, events, str(config["plan_tag"]).strip())

@@ -6,9 +6,9 @@
     2. python import_plan.py stage plans/plan_builder.xlsx imports/<name>.csv
          validates the CSV, turns pace keys into targets, matches each workout against
          the Library, and writes Import and Import Schedule tabs for review
-    3. python import_plan.py apply plans/plan_builder.xlsx --week-end sun
+    3. python import_plan.py apply plans/plan_builder.xlsx --plan <name> --week-end sun
          after you've filled any blank 'action' cells on the Import tab: adds new
-         workouts to Library, replaces Schedule, sets source_week_end
+         workouts to Library and saves the plan under <name> (other plans untouched)
        or python import_plan.py apply plans/plan_builder.xlsx --library-only
          to add the new workouts to Library and change nothing else
 
@@ -24,7 +24,7 @@ from pathlib import Path
 
 from openpyxl.styles import Font, PatternFill
 
-from planlib import DAYS, PlanError, blank, day_index, load_workbook_tables
+from planlib import DAYS, PlanError, blank, day_index, last_used_row, load_workbook_tables, read_table
 
 HERE = Path(__file__).parent
 TEMPLATE = HERE / "prompts" / "convert_plan.md"
@@ -399,51 +399,86 @@ def cmd_stage(args):
     return 0
 
 
+def append_row(ws, values):
+    r = last_used_row(ws) + 1
+    for c, v in enumerate(values, start=1):
+        ws.cell(r, c, v).font = Font(name="Arial")
+
+
 def cmd_apply(args):
     wb, config, library, sheets = load_workbook_tables(args.workbook)
     if "import" not in sheets or "import schedule" not in sheets:
         raise ImportError_("No Import tabs: run stage first")
     if not args.library_only:
-        if not args.week_end:
-            raise ImportError_("--week-end is required (or use --library-only)")
+        if not args.plan or not args.week_end:
+            raise ImportError_("--plan and --week-end are required (or use --library-only)")
         day_index(args.week_end)
+        for needed in ("Plans",):
+            if needed not in wb.sheetnames:
+                raise ImportError_("No Plans tab: run setup_workbook.py first")
     new_rows, sched = apply_import(library, sheets["import"], sheets["import schedule"])
 
     lib = wb["Library"]
     for r in new_rows:
-        lib.append([r["workout_id"], r["category"], r["name"], r["workout_text"]])
-        for c in lib[lib.max_row]:
-            c.font = Font(name="Arial")
+        append_row(lib, [r["workout_id"], r["category"], r["name"], r["workout_text"]])
 
+    added = ", ".join(r["workout_id"] for r in new_rows) or "none"
     if args.library_only:
         for title in (IMPORT_SHEET, IMPORT_SCHEDULE_SHEET):
             del wb[title]
         save(wb, args.workbook)
-        print(f"Added {len(new_rows)} workouts to Library: "
-              f"{', '.join(r['workout_id'] for r in new_rows) or 'none'}")
-        print("Schedule, Config and Layout left as they were.")
+        print(f"Added {len(new_rows)} workouts to Library: {added}")
+        print("Schedule, Plans, Config and Layout left as they were.")
         return 0
 
+    plan = args.plan.strip()
+    week_end = DAYS[day_index(args.week_end)]
+
+    # Schedule: keep every other plan's rows, replace this plan's
     ws = wb["Schedule"]
-    ws.delete_rows(2, ws.max_row)
+    headers = [str(c.value or "").strip().lower() for c in ws[1]]
+    if "plan" not in headers:
+        raise ImportError_("Schedule has no plan column: run setup_workbook.py first")
+    keep = [r for r in read_table(ws) if str(r.get("plan") or "").strip() != plan]
+    ws.delete_rows(2, max(ws.max_row - 1, 1))
+    for r in keep:
+        append_row(ws, [r.get(h) for h in headers])
+    col = {h: i for i, h in enumerate(headers)}
     for s in sched:
-        ws.append([s["week"], s["day"], s["workout_id"], s["note"]])
-        for c in ws[ws.max_row]:
-            c.font = Font(name="Arial")
+        row = [None] * len(headers)
+        row[col["plan"]], row[col["week"]], row[col["day"]] = plan, s["week"], s["day"]
+        row[col["workout_id"]] = s["workout_id"]
+        if "note" in col:
+            row[col["note"]] = s["note"]
+        append_row(ws, row)
+
+    # Plans: add or update this plan's row
+    plans = wb["Plans"]
+    found = False
+    for r in range(2, last_used_row(plans) + 1):
+        if str(plans.cell(r, 1).value or "").strip() == plan:
+            plans.cell(r, 2).value = week_end
+            found = True
+    if not found:
+        append_row(plans, [plan, week_end, f"imported from {Path(args.csv_name or '').name}"
+                           if args.csv_name else None])
 
     cfg = wb["Config"]
-    keys = {str(cfg.cell(r, 1).value).strip(): r for r in range(2, cfg.max_row + 1)}
-    if "source_week_end" in keys:
-        cfg.cell(keys["source_week_end"], 2).value = args.week_end.lower()[:3]
+    keys = {str(cfg.cell(r, 1).value).strip(): r for r in range(2, last_used_row(cfg) + 1)
+            if cfg.cell(r, 1).value}
+    if "plan" in keys:
+        cfg.cell(keys["plan"], 2).value = plan
     else:
-        cfg.append(["source_week_end", args.week_end.lower()[:3]])
+        append_row(cfg, ["plan", plan])
 
-    for title in (IMPORT_SHEET, IMPORT_SCHEDULE_SHEET, "Layout"):
+    for title in (IMPORT_SHEET, IMPORT_SCHEDULE_SHEET, "Layout", "Options"):
         if title in wb.sheetnames:
             del wb[title]
     save(wb, args.workbook)
-    print(f"Added {len(new_rows)} workouts to Library: {', '.join(r['workout_id'] for r in new_rows) or 'none'}")
-    print(f"Schedule replaced ({len(sched)} days). Set race_date and plan_tag in Config, then run layout.py.")
+    print(f"Added {len(new_rows)} workouts to Library: {added}")
+    print(f"Plan {plan!r} saved ({len(sched)} days, weeks end {week_end.title()}); "
+          f"Config plan set to {plan!r}. Other plans on Schedule are untouched.")
+    print("Check race_date and plan_tag in Config, then run layout.py.")
     return 0
 
 
@@ -464,7 +499,9 @@ def main(argv=None):
     s.add_argument("csv")
     a = sub.add_parser("apply", help="merge the reviewed import into Library and Schedule")
     a.add_argument("workbook")
+    a.add_argument("--plan", help="name to save the plan under, e.g. higdon-half-advanced")
     a.add_argument("--week-end", help="weekday the plan's weeks end on, e.g. sun")
+    a.add_argument("--csv-name", help=argparse.SUPPRESS)
     a.add_argument("--library-only", action="store_true",
                    help="only add new workouts to Library; leave Schedule, Config and Layout alone")
     args = parser.parse_args(argv)

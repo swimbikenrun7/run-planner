@@ -30,13 +30,13 @@ def test_blank_and_race_rows_are_not_pushed():
         {"date": date(2026, 11, 24), "workout_id": None},
         {"date": date(2026, 11, 25), "workout_id": "EASY"},
         {"date": RACE, "workout_id": "RACE"},
-    ])
+    ], today=date(2026, 10, 1))
     assert [e["external_id"] for e in events] == ["t-2026-11-25"]
 
 
 def test_unknown_workout_id_fails_loudly():
     with pytest.raises(PlanError, match="NOPE"):
-        build_events(CONFIG, LIBRARY, [{"date": RACE, "workout_id": "NOPE"}])
+        build_events(CONFIG, LIBRARY, [{"date": RACE, "workout_id": "NOPE"}], today=date(2026, 10, 1))
 
 
 def test_duplicate_day_fails():
@@ -44,18 +44,28 @@ def test_duplicate_day_fails():
         build_events(CONFIG, LIBRARY, [
             {"date": RACE, "workout_id": "EASY"},
             {"date": RACE, "workout_id": "EASY"},
-        ])
+        ], today=date(2026, 10, 1))
 
 
-def test_stale_ids_only_touch_this_plans_events():
+def test_stale_ids_only_touch_this_plans_future_events():
     existing = [
         {"external_id": "t-2026-11-20"},  # still in plan: keep
         {"external_id": "t-2026-11-21"},  # workout moved away: delete
+        {"external_id": "t-2026-11-01"},  # in the past: history, never delete
         {"external_id": "other-2026-11-21"},  # different plan: leave alone
         {"external_id": None},  # created by hand in Intervals: leave alone
     ]
     events = [{"external_id": "t-2026-11-20"}]
-    assert stale_ids(existing, events, "t") == ["t-2026-11-21"]
+    assert stale_ids(existing, events, "t", today=date(2026, 11, 10)) == ["t-2026-11-21"]
+
+
+def test_past_and_unplaced_rows_are_not_pushed():
+    events = build_events(CONFIG, LIBRARY, [
+        {"date": date(2026, 11, 1), "workout_id": "EASY"},
+        {"date": None, "workout_id": "INT"},
+        {"date": date(2026, 11, 25), "workout_id": "EASY"},
+    ], today=date(2026, 11, 10))
+    assert [e["external_id"] for e in events] == ["t-2026-11-25"]
 
 
 def test_hand_edits_to_layout_are_checked():
