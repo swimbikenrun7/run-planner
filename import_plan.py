@@ -24,7 +24,16 @@ from pathlib import Path
 
 from openpyxl.styles import Font, PatternFill
 
-from planlib import DAYS, PlanError, blank, day_index, last_used_row, load_workbook_tables, read_table
+from planlib import (
+    DAYS,
+    PlanError,
+    blank,
+    day_index,
+    last_used_row,
+    load_workbook_tables,
+    read_table,
+    save_workbook,
+)
 
 HERE = Path(__file__).parent
 TEMPLATE = HERE / "prompts" / "convert_plan.md"
@@ -380,7 +389,7 @@ def cmd_stage(args):
                         "H": 50, "I": 16, "J": 40})
     write_sheet(wb, IMPORT_SCHEDULE_SHEET, ["week", "day", "incoming_id", "note"], schedule,
                 widths={"A": 6, "B": 6, "C": 16, "D": 40})
-    save(wb, args.workbook)
+    save_workbook(wb, args.workbook)
 
     counts = {m: sum(1 for w in workouts if w["match"] == m) for m in ("exact", "similar", "new")}
     print(f"Staged {len(schedule)} days, {len(workouts)} distinct workouts: "
@@ -426,7 +435,7 @@ def cmd_apply(args):
     if args.library_only:
         for title in (IMPORT_SHEET, IMPORT_SCHEDULE_SHEET):
             del wb[title]
-        save(wb, args.workbook)
+        save_workbook(wb, args.workbook)
         print(f"Added {len(new_rows)} workouts to Library: {added}")
         print("Schedule, Plans, Config and Layout left as they were.")
         return 0
@@ -474,19 +483,12 @@ def cmd_apply(args):
     for title in (IMPORT_SHEET, IMPORT_SCHEDULE_SHEET, "Layout", "Options"):
         if title in wb.sheetnames:
             del wb[title]
-    save(wb, args.workbook)
+    save_workbook(wb, args.workbook)
     print(f"Added {len(new_rows)} workouts to Library: {added}")
     print(f"Plan {plan!r} saved ({len(sched)} days, weeks end {week_end.title()}); "
           f"Config plan set to {plan!r}. Other plans on Schedule are untouched.")
     print("Check race_date and plan_tag in Config, then run layout.py.")
     return 0
-
-
-def save(wb, path):
-    try:
-        wb.save(path)
-    except PermissionError:
-        raise ImportError_("Could not save: close the workbook in Excel and run again.")
 
 
 def main(argv=None):

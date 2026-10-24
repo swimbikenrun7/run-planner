@@ -45,6 +45,7 @@ from planlib import (
     load_workbook_tables,
     long_run_gap,
     read_week,
+    save_workbook,
     taper_days,
     to_date,
     yes,
@@ -535,10 +536,10 @@ def main(argv=None, today=None):
 
 def save(wb, path):
     try:
-        wb.save(path)
+        save_workbook(wb, path)
         return True
-    except PermissionError:
-        print("Could not save: close the workbook in Excel and run again.", file=sys.stderr)
+    except PlanError as e:
+        print(e, file=sys.stderr)
         return False
 
 

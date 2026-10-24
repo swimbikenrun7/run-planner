@@ -18,7 +18,7 @@ import sys
 import openpyxl
 from openpyxl.styles import Font
 
-from planlib import DAYS, last_used_row, read_table, to_date
+from planlib import DAYS, PlanError, last_used_row, read_table, save_workbook, to_date
 
 # Daniels VDOT relationships, as % of threshold SPEED (Intervals.icu uses % of speed)
 PACES = [
@@ -144,9 +144,9 @@ def main(argv=None):
         print("Nothing to do: workbook already set up.")
         return 0
     try:
-        wb.save(args.workbook)
-    except PermissionError:
-        print("Could not save: close the workbook in Excel and run again.", file=sys.stderr)
+        save_workbook(wb, args.workbook)
+    except PlanError as e:
+        print(e, file=sys.stderr)
         return 1
     for c in changes:
         print(f"  {c}")

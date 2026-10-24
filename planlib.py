@@ -1,6 +1,7 @@
 """Shared helpers for layout.py and push.py: workbook reading, days, and plan rules."""
 
 from datetime import date, datetime, timedelta
+from pathlib import Path
 
 import openpyxl
 
@@ -117,6 +118,24 @@ def last_used_row(ws):
         if any(c.value not in (None, "") for c in ws[r]):
             return r
     return 0
+
+
+def lock_file(path):
+    """LibreOffice Calc keeps .~lock.<name># beside a workbook while it's open."""
+    path = Path(path)
+    return path.with_name(f".~lock.{path.name}#")
+
+
+def save_workbook(wb, path):
+    """Save, refusing while the workbook is open: Calc would overwrite our changes on its next save."""
+    lock = lock_file(path)
+    if lock.exists():
+        raise PlanError(f"Could not save: {Path(path).name} is open in LibreOffice Calc. "
+                        f"Close it and run again.\n(If Calc isn't running, delete the leftover lock file {lock})")
+    try:
+        wb.save(path)
+    except PermissionError:
+        raise PlanError("Could not save: close the workbook and run again.")
 
 
 def read_week(rows, library):
