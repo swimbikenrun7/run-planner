@@ -82,6 +82,7 @@ def test_check_then_save_as_a_plan_without_selecting_it(workbook):
     assert "INT-TEST" in [r[0] for r in wb["Library"].iter_rows(values_only=True)]
     assert {r[0] for r in wb["Schedule"].iter_rows(min_row=2, values_only=True)} == {"old", "test-plan"}
     assert wb["Config"]["B2"].value == "old" and "Layout" in wb.sheetnames  # not selected
+    assert "INT-TEST" in at.code[0].value  # the prompt already lists the workout just added
 
 
 def test_save_refuses_while_open_in_calc(workbook):
