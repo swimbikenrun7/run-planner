@@ -22,26 +22,34 @@ Built and tested (33 tests: `test_push.py`, `test_layout.py`, `test_import.py`):
 Live on the user's calendar: the turkey trot 10K plan (Thu Nov 26, 2026), plan_tag
 `turkey-trot-10k-2026`, pushed with the earlier layout engine.
 
-## In progress when handed off: confirm with the user first
+## Migration to named plans: done except the real push
 
-The user had just received the named-plans / Week-template version and these migration steps
-for his master workbook. Ask which are done before assuming the workbook's shape:
+Checked in the workbook on 2026-10-24 and confirmed by the user:
 
-1. `python setup_workbook.py plans/plan_builder.xlsx` (adds Week, Plans, Schedule `plan` column,
-   Config keys; existing Schedule rows become plan `legacy`).
-2. Rename `legacy` to `turkey-trot-10k` on Schedule and Plans; set its `source_week_end` to `thu`.
-3. Add `GROUP-4MI` (easy, `- Press lap 80% Pace 4mi`) to Library; set the Week tab to Sun long,
-   Tue quality, Thu fixed GROUP-4MI, Fri quality, rest easy.
-4. Remove the now-unused Config rows `long_run` and `source_week_end`.
-5. Re-import Higdon as a named plan (`stage` then `apply --plan higdon-half-advanced --week-end sun`).
-6. Run layout, choose an option, review, dry-run push. Target race: Sun May 2, 2027,
-   plan_tag `pig-half-2027`.
+- Plans `turkey-trot-10k` (week ends `thu`) and `higdon_hm` (week ends `sun`). The user keeps
+  these names.
+- Week tab: **Sat long**; Mon, Wed, Fri quality; Thu fixed `EASY-4MI`
+  (`- Press lap 80% Pace 4mi`, the group run); Tue and Sun easy. The user chose this layout
+  option on purpose: making a Sunday long run fit around the Thursday group run took
+  impractical schedule changes.
+- Config: `plan` = `higdon_hm`, `race_date` 2027-05-02, `plan_tag` `pig-half-2027`. The old
+  `long_run` and `source_week_end` rows are gone.
+- Layout: 84 dated rows from Feb 8 to May 2, 2027, none unplaced or flagged.
 
-The user also mentioned moving his own long run to Sunday with Tue/Fri as quality days; that's
-what the Week tab above encodes.
+Dry-run push on 2026-10-24 was clean: 83 events would be pushed (every Layout row except the
+goal race), 0 stale deletions, no existing `pig-half-2027` events. Still to do: the real push,
+when the user says so.
 
 ## Unverified or open
 
+- **Layout fixed 2026-10-24; the saved Layout has 4 easy runs the plan doesn't.** Two bugs were
+  fixed in `place()`: the plan's rest days now give way to displaced easy runs, and a displaced
+  easy run stays in its own plan week instead of drifting to the earliest open day in the
+  whole plan. Rerun on a copy, the Layout now matches the plan week for week. The saved Layout
+  (the one the dry run used) also has easy runs on rest days in weeks 3, 6, 9 and 12 (Sun Feb 28,
+  Mar 21, Apr 11, and both Fri Apr 30 and Sat May 1 in race week). **The user confirmed they
+  are his own edits.** Rerunning layout on the master workbook would remove them, so don't. The
+  Plan page needs a way to keep hand changes across reruns (see ROADMAP).
 - **Hill steps with no pace target** (`- Uphill hard 90s`): not yet seen on the watch. Push one
   hill workout and have the user check it before relying on the format.
 - **The user's older Library entries use pre-convention paces** (tempo 95%, threshold 105%,
@@ -53,9 +61,10 @@ what the Week tab above encodes.
 - **The prompt hasn't been tested on the user's own Excel plans** (dated calendars with mileage
   and short notes, e.g. `10k_Training.xlsx`). They're a different shape from PDF grids.
 - The user's master Library has a block of blank rows (an old append bug, now fixed). Harmless;
-  he can delete them in Excel.
+  he can delete them in his spreadsheet app.
 - README lost its short "push behaviour" section in the last rewrite; CLAUDE.md covers it, but
-  the user-facing README should say it again.
+  the user-facing README should say it again. Its setup section still shows Windows PowerShell
+  commands; the project moved to Linux (bash) in October 2026.
 
 ## Backlog (the user sets priorities; don't start these unprompted)
 

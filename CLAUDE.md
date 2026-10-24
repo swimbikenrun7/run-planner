@@ -7,13 +7,14 @@ Intervals.icu calendar, which syncs them to Garmin Connect and the user's watch.
 (substituting workouts, filling easy runs), and pushes it to his watch with one command,
 rerunnable whenever the plan changes. The workbook is the user interface; Python does the work.
 
-Read `docs/HANDOFF.md` for current status and open items, and `docs/DECISIONS.md` before
-changing anything a decision there covers.
+Read `docs/HANDOFF.md` for current status and open items, `docs/ROADMAP.md` for direction,
+and `docs/DECISIONS.md` before changing anything a decision there covers.
 
 ## Working agreement
 
-- **The user owns Git commits and final acceptance.** Don't commit. When work is ready, say
-  what changed and suggest a commit message.
+- **Git workflow (user, Oct 2026):** do all work on a feature branch and commit there in
+  logical pieces as it's proven (tests pass, evidence shown). **Ask for approval before merging
+  to `main` and before any `git push`.** The user owns final acceptance.
 - **Evidence over claims.** Show test output, a dry run, or the generated Layout rather than
   saying something works.
 - **Never run `push.py` without `--dry-run` unless the user explicitly asks.** It writes to
@@ -24,25 +25,31 @@ changing anything a decision there covers.
 - **The user defines training correctness.** He's a licensed mechanical engineer and an
   experienced runner, and a programming novice with a lot of Excel VBA background. Explain
   code decisions plainly; defer to him on training rules. When a rule is ambiguous, ask.
-- **When the user has to act, give explicit numbered steps** with exact PowerShell commands
+- **When the user has to act, give explicit numbered steps** with exact bash commands
   and where files go. He has asked for this specifically.
 - He prefers priorities to emerge from building over big up-front plans. Propose the next
   step, not a full roadmap.
 
 ## Environment
 
-- Windows, PowerShell, Python 3.14 in `.venv` (`.venv\Scripts\Activate.ps1`).
+- Linux (Arch), bash. Python 3.14 (via mise) in `.venv` (`source .venv/bin/activate`).
+  Moved from Windows/PowerShell in October 2026; older docs and the README may still show
+  Windows commands.
 - Run tests with `python -m pytest` (plain `pytest` can't import the modules from `tests/`).
-- **Excel locks open workbooks.** Scripts that save the workbook fail with a PermissionError
-  if it's open; they print "close the workbook in Excel". Keep that behavior.
-- PowerShell `>` redirection writes UTF-16. Scripts write their own output files in UTF-8
-  instead of relying on redirection.
+- **The user edits the workbook in LibreOffice Calc, which doesn't lock open files** the way
+  Windows Excel did. A script can save the workbook while Calc has it open, and saving from
+  Calc afterwards silently overwrites the script's changes. While a workbook is open, Calc
+  leaves a `.~lock.<name>.xlsx#` file next to it. Every save goes through
+  `planlib.save_workbook`, which refuses while that lock file exists (and still catches
+  Windows' PermissionError). Keep that behavior; never call `wb.save` directly.
+- Scripts write their own output files in UTF-8 instead of relying on shell redirection
+  (a holdover from PowerShell writing UTF-16; still the pattern).
 - Credentials live in `.env` (`INTERVALS_API_KEY`, `INTERVALS_ATHLETE_ID`); never print or
-  commit them. `.env.example` is the committed template.
+  commit them. `env.example` is the committed template.
 
 ## Commands
 
-```powershell
+```bash
 python setup_workbook.py plans/plan_builder.xlsx        # idempotent: adds tabs/keys the code needs
 python import_plan.py prompt plans/plan_builder.xlsx    # writes imports/prompt.md for a Claude chat
 python import_plan.py stage  plans/plan_builder.xlsx imports/<plan>.csv
@@ -56,7 +63,7 @@ python -m pytest
 
 | File | Role |
 |---|---|
-| `planlib.py` | Shared: workbook reading (`read_table`, `last_used_row`), days, Config helpers, `read_week`, `rule_violations` |
+| `planlib.py` | Shared: workbook reading (`read_table`, `last_used_row`), `save_workbook` (lock check), days, Config helpers, `read_week`, `rule_violations` |
 | `import_plan.py` | prompt → stage → apply. Pace keys to targets, workout validation, Library matching, named plans |
 | `layout.py` | Places the selected plan on dates around the Week template; suggests structural options when it doesn't fit |
 | `push.py` | Layout → Intervals.icu events (bulk upsert), deletes stale future events |
