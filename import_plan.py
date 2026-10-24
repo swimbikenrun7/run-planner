@@ -18,6 +18,7 @@ Close the workbook in Excel before each step.
 import argparse
 import csv
 import difflib
+import io
 import re
 import sys
 from pathlib import Path
@@ -214,13 +215,19 @@ def match_workout(text, category, library):
 
 # ---------- stage ----------
 
+def parse_csv(text):
+    """CSV text -> rows. Tolerates a byte-order mark and the ``` fences a chat wraps it in."""
+    lines = [ln for ln in text.lstrip("\ufeff").splitlines() if not ln.strip().startswith("```")]
+    reader = csv.DictReader(io.StringIO("\n".join(lines)))
+    missing = [c for c in CSV_COLUMNS if c not in (reader.fieldnames or [])]
+    if missing:
+        raise ImportError_(f"CSV is missing columns: {', '.join(missing)}")
+    return list(reader)
+
+
 def read_csv(path):
     with open(path, newline="", encoding="utf-8-sig") as f:
-        reader = csv.DictReader(f)
-        missing = [c for c in CSV_COLUMNS if c not in (reader.fieldnames or [])]
-        if missing:
-            raise ImportError_(f"CSV is missing columns: {', '.join(missing)}")
-        return list(reader)
+        return parse_csv(f.read())
 
 
 def stage_plan(rows, library, paces, threshold):
@@ -354,18 +361,23 @@ def library_listing(library):
     return "\n".join(lines) or "(empty)"
 
 
-def cmd_prompt(args):
-    _, config, library, sheets = load_workbook_tables(args.workbook)
+def build_prompt(config, library, sheets):
+    """The conversion prompt with this workbook's paces, offset unit and Library filled in."""
     paces = load_paces(sheets)
     unit = "mile"
     if not blank(config.get("threshold_pace")):
         unit = {"mi": "mile", "km": "km"}[parse_pace(config["threshold_pace"])[1]]
     descriptions = {str(r["key"]).strip().upper(): r.get("description") for r in sheets["paces"]}
     pace_lines = "\n".join(f"- {{{k}}}: {descriptions.get(k) or ''}" for k in paces)
-    text = (TEMPLATE.read_text(encoding="utf-8")
+    return (TEMPLATE.read_text(encoding="utf-8")
             .replace("{{PACES}}", pace_lines)
             .replace("{{OFFSET_UNIT}}", unit)
             .replace("{{LIBRARY}}", library_listing(library)))
+
+
+def cmd_prompt(args):
+    _, config, library, sheets = load_workbook_tables(args.workbook)
+    text = build_prompt(config, library, sheets)
     out = HERE / "imports" / "prompt.md"
     out.parent.mkdir(exist_ok=True)
     out.write_text(text, encoding="utf-8")
@@ -426,24 +438,46 @@ def cmd_apply(args):
             if needed not in wb.sheetnames:
                 raise ImportError_("No Plans tab: run setup_workbook.py first")
     new_rows, sched = apply_import(library, sheets["import"], sheets["import schedule"])
+    source = f"imported from {Path(args.csv_name).name}" if args.csv_name else None
+    apply_to_workbook(wb, new_rows, sched, None if args.library_only else args.plan,
+                      args.week_end, source)
+    save_workbook(wb, args.workbook)
 
+    added = ", ".join(r["workout_id"] for r in new_rows) or "none"
+    print(f"Added {len(new_rows)} workouts to Library: {added}")
+    if args.library_only:
+        print("Schedule, Plans, Config and Layout left as they were.")
+        return 0
+    plan, week_end = args.plan.strip(), DAYS[day_index(args.week_end)]
+    print(f"Plan {plan!r} saved ({len(sched)} days, weeks end {week_end.title()}); "
+          f"Config plan set to {plan!r}. Other plans on Schedule are untouched.")
+    print("Check race_date and plan_tag in Config, then run layout.py.")
+    return 0
+
+
+def apply_to_workbook(wb, new_rows, sched, plan=None, week_end=None, source=None, select=True):
+    """Write an applied import into wb (doesn't save). plan=None adds to Library only.
+
+    select makes the plan Config's plan and removes the Layout and Options tabs, which belonged
+    to the previously selected plan.
+    """
     lib = wb["Library"]
     for r in new_rows:
         append_row(lib, [r["workout_id"], r["category"], r["name"], r["workout_text"]])
-
-    added = ", ".join(r["workout_id"] for r in new_rows) or "none"
-    if args.library_only:
-        for title in (IMPORT_SHEET, IMPORT_SCHEDULE_SHEET):
+    removed = [IMPORT_SHEET, IMPORT_SCHEDULE_SHEET]
+    if plan is not None:
+        plan = plan.strip()
+        save_plan_rows(wb, plan, DAYS[day_index(week_end)], sched, source)
+        if select:
+            set_config(wb, "plan", plan)
+            removed += ["Layout", "Options"]
+    for title in removed:
+        if title in wb.sheetnames:
             del wb[title]
-        save_workbook(wb, args.workbook)
-        print(f"Added {len(new_rows)} workouts to Library: {added}")
-        print("Schedule, Plans, Config and Layout left as they were.")
-        return 0
 
-    plan = args.plan.strip()
-    week_end = DAYS[day_index(args.week_end)]
 
-    # Schedule: keep every other plan's rows, replace this plan's
+def save_plan_rows(wb, plan, week_end, sched, source):
+    """Replace this plan's Schedule rows (other plans untouched) and add or update its Plans row."""
     ws = wb["Schedule"]
     headers = [str(c.value or "").strip().lower() for c in ws[1]]
     if "plan" not in headers:
@@ -461,7 +495,6 @@ def cmd_apply(args):
             row[col["note"]] = s["note"]
         append_row(ws, row)
 
-    # Plans: add or update this plan's row
     plans = wb["Plans"]
     found = False
     for r in range(2, last_used_row(plans) + 1):
@@ -469,26 +502,17 @@ def cmd_apply(args):
             plans.cell(r, 2).value = week_end
             found = True
     if not found:
-        append_row(plans, [plan, week_end, f"imported from {Path(args.csv_name or '').name}"
-                           if args.csv_name else None])
+        append_row(plans, [plan, week_end, source])
 
+
+def set_config(wb, key, value):
     cfg = wb["Config"]
     keys = {str(cfg.cell(r, 1).value).strip(): r for r in range(2, last_used_row(cfg) + 1)
             if cfg.cell(r, 1).value}
-    if "plan" in keys:
-        cfg.cell(keys["plan"], 2).value = plan
+    if key in keys:
+        cfg.cell(keys[key], 2).value = value
     else:
-        append_row(cfg, ["plan", plan])
-
-    for title in (IMPORT_SHEET, IMPORT_SCHEDULE_SHEET, "Layout", "Options"):
-        if title in wb.sheetnames:
-            del wb[title]
-    save_workbook(wb, args.workbook)
-    print(f"Added {len(new_rows)} workouts to Library: {added}")
-    print(f"Plan {plan!r} saved ({len(sched)} days, weeks end {week_end.title()}); "
-          f"Config plan set to {plan!r}. Other plans on Schedule are untouched.")
-    print("Check race_date and plan_tag in Config, then run layout.py.")
-    return 0
+        append_row(cfg, [key, value])
 
 
 def main(argv=None):

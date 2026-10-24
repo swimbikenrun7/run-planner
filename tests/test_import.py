@@ -1,10 +1,13 @@
+import openpyxl
 import pytest
 
 from import_plan import (
     ImportError_,
     apply_import,
+    apply_to_workbook,
     check_workout,
     match_workout,
+    parse_csv,
     resolve_targets,
     stage_plan,
 )
@@ -133,3 +136,45 @@ def test_apply_requires_every_action():
     with pytest.raises(ImportError_, match="blank"):
         apply_import(LIBRARY, [{"incoming_id": "X", "category": "easy", "name": "x",
                                 "workout_text": "t", "action": None}], [])
+
+
+# --- pasted CSV and saving to the workbook
+
+def test_pasted_csv_tolerates_chat_code_fences():
+    text = ("```csv\nweek,day,workout_id,category,name,workout_text,note\n"
+            "1,Mon,EASY-3MI,easy,Easy 3mi,- Press lap {E} 3mi,\n```\n")
+    assert [r["workout_id"] for r in parse_csv(text)] == ["EASY-3MI"]
+    with pytest.raises(ImportError_, match="missing columns"):
+        parse_csv("week,day\n1,Mon\n")
+
+
+def workbook(config_plan="old"):
+    wb = openpyxl.Workbook()
+    wb.active.title = "Config"
+    for name, rows in {"Config": [["key", "value"], ["plan", config_plan]],
+                       "Library": [["workout_id", "category", "name", "workout_text"]],
+                       "Plans": [["plan", "source_week_end", "notes"], ["old", "sun", None]],
+                       "Schedule": [["plan", "week", "day", "workout_id", "note"], ["old", 1, "Mon", "X", None]],
+                       "Layout": [["date"]]}.items():
+        ws = wb[name] if name in wb.sheetnames else wb.create_sheet(name)
+        for r in rows:
+            ws.append(r)
+    return wb
+
+
+NEW = [{"workout_id": "E3", "category": "easy", "name": "Easy", "workout_text": "- Press lap 80% Pace 3mi"}]
+SCHED = [{"week": 1, "day": "Mon", "workout_id": "E3", "note": None}]
+
+
+def test_saving_a_plan_without_selecting_it_keeps_config_and_layout():
+    wb = workbook()
+    apply_to_workbook(wb, NEW, SCHED, "new", "sun", select=False)
+    assert wb["Config"]["B2"].value == "old" and "Layout" in wb.sheetnames
+    assert [r[0] for r in wb["Schedule"].iter_rows(min_row=2, values_only=True)] == ["old", "new"]
+    assert wb["Library"]["A2"].value == "E3"
+
+
+def test_saving_and_selecting_a_plan_replaces_the_old_layout():
+    wb = workbook()
+    apply_to_workbook(wb, NEW, SCHED, "new", "sun")
+    assert wb["Config"]["B2"].value == "new" and "Layout" not in wb.sheetnames
