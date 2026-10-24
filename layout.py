@@ -221,21 +221,25 @@ def place(ctx, week, allow_pre_long, off_template=None):
             else:
                 put(spot, item, True)
 
-    # easy runs and rest days: keep their own date when free, otherwise fill in order
+    # easy runs keep their own date when free, otherwise the nearest open day in their own week
+    # (earlier first, like hard sessions); the plan's rest days give way to them
     displaced = []
-    for item in (i for i in ctx.items if i["category"] not in ctx.hard):
+    for item in (i for i in ctx.items if i["wid"] and i["category"] not in ctx.hard):
         if item["naive"] not in placed and ctx.plan_start <= item["naive"] <= ctx.race_date:
             placed[item["naive"]] = item
         else:
             displaced.append(item)
-    open_days = [d for d in ctx.days if d not in placed]
-    displaced_runs = [i for i in displaced if i["wid"]]  # rest days give way first
-    for d, item in zip(open_days, displaced_runs):
-        placed[d] = item
-    for d in open_days[len(displaced_runs):]:
-        placed[d] = {"wid": None, "category": "rest", "source_day": "", "note": None, "naive": d}
-    for item in displaced_runs[len(open_days):]:
-        unplaced.append((item, "no free day for this easy run"))
+    for item in displaced:
+        free = sorted((d for d in ctx.days if ctx.block(d) == item["week"] and d not in placed),
+                      key=lambda d: (d > item["naive"], abs((d - item["naive"]).days)))
+        if free:
+            placed[free[0]] = item
+        else:
+            unplaced.append((item, "no free day for this easy run in its week"))
+    rest = {i["naive"]: i for i in ctx.items if not i["wid"]}
+    for d in ctx.days:
+        if d not in placed:
+            placed[d] = rest.get(d) or {"wid": None, "category": "rest", "source_day": "", "note": None, "naive": d}
     return placed, unplaced
 
 

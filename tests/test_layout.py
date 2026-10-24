@@ -122,3 +122,15 @@ def test_plans_are_selected_by_name():
     assert (name, week_end, [r["workout_id"] for r in rows]) == ("a", 6, ["EASY"])
     with pytest.raises(PlanError):
         selected_plan({"plan": "b"}, sheets)  # not on the Plans tab
+
+
+def test_rest_days_give_way_to_displaced_easy_runs():
+    # the user's week: the fixed group run and three quality days leave no room for the plan's rest day
+    ctx = ctx_for([HIGDON_WEEK, HIGDON_WEEK, RACE_WEEK])
+    tpl = week_tpl(sat="long", mon="quality", wed="quality", fri="quality", thu=("fixed", "GROUP"))
+    placed, unplaced = place(ctx, tpl, True)
+    assert unplaced == []
+    for wk in (1, 2, 3):  # each week keeps its own easy runs: none drift into another week
+        days = [d for d in ctx.days if ctx.block(d) == wk]
+        assert sum(placed[d]["wid"] == "EASY" for d in days) == sum(
+            i["wid"] == "EASY" for i in ctx.items if i["week"] == wk)
