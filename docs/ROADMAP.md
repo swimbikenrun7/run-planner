@@ -16,7 +16,7 @@ step at a time, check it with the user, and update this file as things change.
 
 ## Steps
 
-**1. App shell and Import page.** The import steps have the most manual work, so they come first.
+**1. App shell and Import page.** Built 2026-10-24 (`app.py`, `ui/import_page.py`). The import steps have the most manual work, so they come first.
 - The app builds the prompt and shows a Copy button.
 - The user pastes the CSV from the chat into a text box, with no file to save or find.
 - Stage shows its review as a table, with the `action` choice made in the app.

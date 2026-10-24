@@ -1,0 +1,8 @@
+# Only this machine can reach the app directly; other devices go through `tailscale serve`.
+[server]
+address = "localhost"
+port = 8501
+headless = true
+
+[browser]
+gatherUsageStats = false

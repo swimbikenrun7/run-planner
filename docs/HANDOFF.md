@@ -40,6 +40,21 @@ Dry-run push on 2026-10-24 was clean: 83 events would be pushed (every Layout ro
 goal race), 0 stale deletions, no existing `pig-half-2027` events. Still to do: the real push,
 when the user says so.
 
+## Import page (built 2026-10-24, on branch `import-page`)
+
+`streamlit run app.py`, Tailscale for other devices (ROADMAP). It covers the steps above:
+- copy the prompt
+- paste Claude's whole reply (only the CSV block is read)
+- Check
+- review the matches and choose actions in a table
+- save as a plan or Library only
+
+Saving a plan does **not** make it Config's selected plan unless the user ticks the box, so
+importing a future plan doesn't wipe his hand-edited Layout (the CLI `apply` still selects).
+Verified headlessly on a copy of the master workbook with the Higdon reply (84 days, 32 exact
+matches). A live browser check failed because the browser automation didn't respond, so the user
+hasn't seen it running yet. The user hasn't set up Tailscale yet either.
+
 ## Unverified or open
 
 - **Layout fixed 2026-10-24; the saved Layout has 4 easy runs the plan doesn't.** Two bugs were

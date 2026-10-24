@@ -216,8 +216,12 @@ def match_workout(text, category, library):
 # ---------- stage ----------
 
 def parse_csv(text):
-    """CSV text -> rows. Tolerates a byte-order mark and the ``` fences a chat wraps it in."""
-    lines = [ln for ln in text.lstrip("\ufeff").splitlines() if not ln.strip().startswith("```")]
+    """CSV text -> rows. Takes a whole chat reply: when there's a ``` code block, only its
+    contents are read, so the notes Claude writes before it don't matter."""
+    lines = text.lstrip("\ufeff").splitlines()
+    fences = [i for i, ln in enumerate(lines) if ln.strip().startswith("```")]
+    if fences:
+        lines = lines[fences[0] + 1:fences[1] if len(fences) > 1 else len(lines)]
     reader = csv.DictReader(io.StringIO("\n".join(lines)))
     missing = [c for c in CSV_COLUMNS if c not in (reader.fieldnames or [])]
     if missing:

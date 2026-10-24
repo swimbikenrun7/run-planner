@@ -140,9 +140,9 @@ def test_apply_requires_every_action():
 
 # --- pasted CSV and saving to the workbook
 
-def test_pasted_csv_tolerates_chat_code_fences():
-    text = ("```csv\nweek,day,workout_id,category,name,workout_text,note\n"
-            "1,Mon,EASY-3MI,easy,Easy 3mi,- Press lap {E} 3mi,\n```\n")
+def test_pasted_chat_reply_reads_only_the_csv_block():
+    text = ("Interpreted 'hard' as I pace.\n\n```csv\nweek,day,workout_id,category,name,workout_text,note\n"
+            "1,Mon,EASY-3MI,easy,Easy 3mi,- Press lap {E} 3mi,\n```\nLet me know if...\n")
     assert [r["workout_id"] for r in parse_csv(text)] == ["EASY-3MI"]
     with pytest.raises(ImportError_, match="missing columns"):
         parse_csv("week,day\n1,Mon\n")
