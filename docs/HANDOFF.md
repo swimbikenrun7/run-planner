@@ -104,8 +104,6 @@ plans) and from May 3, 2027 onward: these are what the gap filler (ROADMAP step 
 - **Triathlon plans** (the user has `Tri_Training_Sched.xlsx`). Needs a sport per workout
   (Intervals takes Swim/Ride/Run), more than one workout per day (touches Schedule, Layout,
   and the one-hard-day-per-date assumptions in layout), and cross-sport spacing rules.
-- **Automate the conversion step** with a direct Claude API call instead of copy-paste through
-  a chat. Wait until the prompt is reliable across plan styles.
 - **More suggestion kinds** in layout, e.g. fold HM-pace work into the long run as a fast
   finish (the user considered this for Higdon).
 - The goal race isn't pushed; Intervals has race event categories that could be used.

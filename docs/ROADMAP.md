@@ -35,7 +35,7 @@ The `main()` functions only print, so the app calls the logic directly. Saves go
 - Keep the user's hand changes to a layout across reruns. Today rerunning layout overwrites the
   Layout tab, and the user does edit it (e.g. easy runs on the plan's rest days).
 
-**3. Optional: automatic conversion.** The user pastes a URL or drops a PDF, and the app sends it
+**3. ~~Optional: automatic conversion.~~ Closed (user, 2026-10-24): no paid Claude API; conversion stays in a chat.** The user pastes a URL or drops a PDF, and the app sends it
 to Claude through the API instead of a chat. Do this only once the prompt is reliable across
 plan styles. It reverses decision 8 (no API billing), so it's the user's call.
 
