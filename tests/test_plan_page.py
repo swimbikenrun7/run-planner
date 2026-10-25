@@ -174,3 +174,21 @@ def test_after_choosing_an_option_you_can_go_straight_to_the_check(workbook):
         [saved[d] if saved[d] != "fixed" else None for d in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]]
     assert next(b for b in at.button if b.label == "Save settings").disabled  # nothing unsaved
     assert not next(b for b in at.button if b.label == "Check against Intervals").disabled
+
+
+def test_changes_saved_elsewhere_reload_section_one(workbook):
+    at = page()
+    wb = openpyxl.load_workbook(workbook)  # as if edited and saved in Calc
+    wb["Week"]["B3"].value = "long"  # Tue
+    wb["Week"]["B8"].value = "easy"  # Sun
+    wb.save(workbook)
+    at.run()
+    assert at.selectbox(key="day1").value == "long" and at.selectbox(key="day6").value == ""
+    assert next(b for b in at.button if b.label == "Save settings").disabled  # nothing unsaved
+
+
+def test_unsaved_changes_are_named(workbook):
+    at = page()
+    at.selectbox(key="day0").select("quality").run()
+    assert any("Not saved yet: Mon" in c.value for c in at.caption)
+    assert any("(Mon)" in i.value for i in at.info)
