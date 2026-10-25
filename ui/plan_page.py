@@ -6,9 +6,21 @@ import pandas as pd
 import streamlit as st
 
 import push
-from import_plan import ImportError_, set_config, set_plan_fields
-from layout import compute_layout, hard_days_summary, write_result
-from planlib import DAYS, PlanError, blank, load_workbook_tables, save_workbook, to_date
+from import_plan import CATEGORIES, ImportError_, set_config, set_plan_fields
+from layout import compute_layout, hard_days_summary, write_result, write_week
+from planlib import (
+    DAYS,
+    PlanError,
+    blank,
+    hard_categories,
+    load_workbook_tables,
+    long_run_gap,
+    read_week,
+    save_workbook,
+    taper_days,
+    to_date,
+    yes,
+)
 from ui.common import sidebar, workbook_path
 
 # background colours for the calendar; text is set dark so it reads in light and dark themes
@@ -39,17 +51,33 @@ def saving(change):
     return None
 
 
-def save_settings(plan, race_date, plan_tag, rest_fill, pre_race_fill):
+def save_settings(new):
+    """Save section 1: Config plan/race/rules, the plan's rest-day fill, and the Week tab."""
     def change(wb):
-        set_config(wb, "plan", plan)
-        set_config(wb, "race_date", datetime.combine(race_date, datetime.min.time()))
-        set_config(wb, "plan_tag", plan_tag)
-        set_plan_fields(wb, plan, {"rest_fill": rest_fill or None, "pre_race_fill": pre_race_fill or None})
+        set_config(wb, "plan", new["plan"])
+        set_config(wb, "race_date", datetime.combine(new["race_date"], datetime.min.time()))
+        set_config(wb, "plan_tag", new["plan_tag"])
+        for key in ("taper_days", "long_run_gap", "allow_pre_long", "long_run_days", "hard_categories"):
+            set_config(wb, key, new[key])
+        set_plan_fields(wb, new["plan"], {"rest_fill": new["rest_fill"] or None,
+                                          "pre_race_fill": new["pre_race_fill"] or None})
+        write_week(wb, new["week"])
     error = saving(change)
     st.session_state.message = ("error", error) if error else (
         "success", "Settings saved. Lay out the plan again so the Layout matches them.")
     st.session_state.pop("picks", None)
     st.session_state.pop("preview", None)
+
+
+def week_choices(week):
+    """Week tab -> one dropdown value per day: '' (open), 'long', 'quality' or a fixed workout_id."""
+    return [wid if role == "fixed" else role if role in ("long", "quality") else "" for role, wid in
+            (week[d] for d in range(7))]
+
+
+def week_from_choices(choices):
+    return {d: ("fixed", c) if c in library else (c, None) if c in ("long", "quality") else ("easy", None)
+            for d, c in enumerate(choices)}
 
 
 def lay_out(option=None):
@@ -135,30 +163,71 @@ if "message" in st.session_state:
     kind, text = st.session_state.pop("message")
     (st.success if kind == "success" else st.error)(text)
 
-# ---------- 1. plan and race ----------
-st.subheader("1. Plan and race")
+# ---------- 1. plan, race and your week ----------
+st.subheader("1. Plan, race and your week")
 names = sorted(plans)
 current = str(config.get("plan") or "").strip()
 c1, c2, c3 = st.columns(3)
-plan = c1.selectbox("Plan", names, index=names.index(current) if current in names else 0)
-race_date = c2.date_input("Race date", value=to_date(config["race_date"]) if not blank(config.get("race_date"))
-                          else date.today(), format="YYYY-MM-DD")
-plan_tag = c3.text_input("plan_tag (Intervals ID prefix)", value=str(config.get("plan_tag") or ""))
-easy = [""] + sorted(w for w, r in library.items() if str(r.get("category") or "").strip().lower() == "easy")
-row = plans[plan]
-c4, c5 = st.columns(2)
-rest_now, pre_now = (str(row.get(k) or "").strip() for k in ("rest_fill", "pre_race_fill"))
-rest_fill = c4.selectbox("Rest days become (blank = keep rest days)", easy,
-                         index=easy.index(rest_now) if rest_now in easy else 0)
-pre_race_fill = c5.selectbox("Day before the race (shortest run last)", easy,
-                             index=easy.index(pre_now) if pre_now in easy else 0)
+new = {"plan": c1.selectbox("Plan", names, index=names.index(current) if current in names else 0)}
 saved_date = to_date(config["race_date"]) if not blank(config.get("race_date")) else None
-dirty = (plan != current or race_date != saved_date or plan_tag.strip() != str(config.get("plan_tag") or "").strip()
-         or rest_fill != rest_now or pre_race_fill != pre_now)
-if plan_tag.strip() != str(config.get("plan_tag") or "").strip() and config.get("plan_tag"):
+new["race_date"] = c2.date_input("Race date", value=saved_date or date.today(), format="YYYY-MM-DD")
+new["plan_tag"] = c3.text_input("plan_tag (Intervals ID prefix)", value=str(config.get("plan_tag") or "")).strip()
+
+st.markdown("**Your week**: what each day is for. Layout fits the plan around it.")
+try:
+    saved_week = week_choices(read_week(sheets.get("week", []), library))
+except PlanError as e:
+    st.error(f"The Week tab has problems: {e}")
+    saved_week = [""] * 7
+labels = {"": "(open)", "long": "long run", "quality": "quality"}
+options = ["", "long", "quality"] + sorted(library)
+cols = st.columns(7)
+choices = [cols[d].selectbox(DAYS[d].title(), options, index=options.index(saved_week[d]) if saved_week[d] in options else 0,
+                             format_func=lambda o: labels.get(o, o), key=f"day{d}") for d in range(7)]
+st.caption("**long run**: the long run and tune-up races. **quality**: hard sessions go here first. "
+           "**A workout**: that day always gets it (e.g. a club run). **(open)**: no constraint; the plan's "
+           "easy runs land here, and a hard session only if it fits nowhere else.")
+new["week"] = week_from_choices(choices)
+if sum(1 for c in choices if c == "long") > 1:
+    st.error("Only one long-run day.")
+
+easy = [""] + sorted(w for w, r in library.items() if str(r.get("category") or "").strip().lower() == "easy")
+row = plans[new["plan"]]
+rest_now, pre_now = (str(row.get(k) or "").strip() for k in ("rest_fill", "pre_race_fill"))
+c4, c5 = st.columns(2)
+new["rest_fill"] = c4.selectbox("Rest days become (blank = keep rest days)", easy,
+                                index=easy.index(rest_now) if rest_now in easy else 0)
+new["pre_race_fill"] = c5.selectbox("Day before the race (shortest run last)", easy,
+                                    index=easy.index(pre_now) if pre_now in easy else 0)
+
+saved_rules = {"taper_days": taper_days(config), "long_run_gap": long_run_gap(config),
+               "allow_pre_long": "yes" if yes(config.get("allow_pre_long")) else "no",
+               "long_run_days": ", ".join(DAYS[d] for d in sorted(
+                   {DAYS.index(x.strip()[:3].lower()) for x in str(config.get("long_run_days") or "sat, sun").split(",")
+                    if x.strip()})),
+               "hard_categories": ", ".join(c for c in sorted(CATEGORIES) if c in hard_categories(config))}
+with st.expander("Layout rules"):
+    r1, r2 = st.columns(2)
+    new["taper_days"] = r1.number_input("No hard sessions in the last N days before the race", 0, 14,
+                                        saved_rules["taper_days"])
+    new["long_run_gap"] = r2.number_input("No long run within N days of the race", 0, 21, saved_rules["long_run_gap"])
+    new["allow_pre_long"] = "yes" if st.toggle(
+        "Allow the plan's session the day before the long run (back-to-back hard days)",
+        value=saved_rules["allow_pre_long"] == "yes") else "no"
+    new["long_run_days"] = ", ".join(st.multiselect(
+        "Days the long run may move to when layout suggests options", DAYS,
+        default=saved_rules["long_run_days"].split(", "), format_func=str.title))
+    new["hard_categories"] = ", ".join(st.multiselect(
+        "Categories that count as hard", sorted(CATEGORIES), default=saved_rules["hard_categories"].split(", ")))
+
+saved = {"plan": current, "race_date": saved_date, "plan_tag": str(config.get("plan_tag") or "").strip(),
+         "week": week_from_choices(saved_week), "rest_fill": rest_now, "pre_race_fill": pre_now, **saved_rules}
+dirty = any(new[k] != saved[k] for k in new)
+if new["plan_tag"] != saved["plan_tag"] and saved["plan_tag"]:
     st.caption("Changing plan_tag after a push leaves the events pushed under the old tag in Intervals.")
-st.button("Save settings", type="primary" if dirty else "secondary", disabled=not dirty or not plan_tag.strip(),
-          on_click=save_settings, args=(plan, race_date, plan_tag.strip(), rest_fill, pre_race_fill))
+st.button("Save settings", type="primary" if dirty else "secondary",
+          disabled=not dirty or not new["plan_tag"] or sum(1 for c in choices if c == "long") > 1,
+          on_click=save_settings, args=(new,))
 
 # ---------- 2. lay out ----------
 st.subheader("2. Lay out")

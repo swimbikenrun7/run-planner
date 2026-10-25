@@ -497,6 +497,20 @@ def write_options(wb, picks):
         ws.column_dimensions[col].width = w
 
 
+def write_week(wb, week):
+    """Write a whole week template (role and workout_id per day) to the Week tab."""
+    ws = wb["Week"]
+    col = {str(c.value or "").strip().lower(): c.column for c in ws[1]}
+    for r in range(2, last_used_row(ws) + 1):
+        try:
+            d = day_index(ws.cell(r, col["day"]).value)
+        except PlanError:
+            continue
+        role, wid = week[d]
+        ws.cell(r, col["role"]).value = role
+        ws.cell(r, col["workout_id"]).value = wid if role == "fixed" else None
+
+
 def save_week(wb, week, allow):
     ws = wb["Week"]
     headers = [str(c.value).strip().lower() for c in ws[1]]

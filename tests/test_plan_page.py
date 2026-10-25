@@ -77,6 +77,10 @@ def click(at, label):
     return at
 
 
+def labelled(widgets, start):
+    return next(w for w in widgets if w.label.startswith(start))
+
+
 def sheet(path, name):
     return [r for r in openpyxl.load_workbook(path)[name].iter_rows(min_row=2, values_only=True) if any(r)]
 
@@ -103,7 +107,7 @@ def test_options_appear_as_cards_and_choosing_one_updates_the_week(workbook, mon
 def test_save_settings_writes_config_and_plans(workbook):
     at = page()
     at.text_input[0].input("t2").run()
-    at.selectbox[1].select("").run()  # keep rest days
+    labelled(at.selectbox, "Rest days become").select("").run()  # keep rest days
     at = click(at, "Save settings")
     config = dict(r[:2] for r in sheet(workbook, "Config"))
     assert config["plan_tag"] == "t2"
@@ -126,3 +130,28 @@ def test_without_credentials_the_check_works_but_push_is_off(workbook):
     at = click(click(page(), "Lay out"), "Check against Intervals")
     assert any("No .env credentials" in w.value for w in at.warning)
     assert not [b for b in at.button if b.label == "Push"]
+
+
+def test_week_dropdowns_and_rules_are_saved_and_used_by_layout(workbook):
+    at = page()
+    at.selectbox(key="day3").select("EASY-2MI").run()  # Thursday: club run
+    at.selectbox(key="day5").select("long").run()       # Saturday long...
+    at.selectbox(key="day6").select("").run()           # ...so Sunday is open
+    at.toggle[0].set_value(False).run()
+    at = click(at, "Save settings")
+    week = {r[0]: (r[1], r[2]) for r in sheet(workbook, "Week")}
+    assert week["Thu"] == ("fixed", "EASY-2MI") and week["Sat"] == ("long", None) and week["Sun"] == ("easy", None)
+    assert dict(r[:2] for r in sheet(workbook, "Config"))["allow_pre_long"] == "no"
+    at = click(at, "Lay out")
+    if not at.success:  # the plan doesn't fit this week: keep the week as it is
+        at.button(key="pick0").click().run()
+    rows = sheet(workbook, "Layout")
+    assert [r[3] for r in rows if r[1] == "Thu"] == ["EASY-2MI", "EASY-2MI"]
+    assert {r[3] for r in rows if r[1] == "Sat" and r[0]} <= {"LONG", "EASY-2MI"}  # long day (shakeout before race)
+
+
+def test_two_long_days_cannot_be_saved(workbook):
+    at = page()
+    at.selectbox(key="day5").select("long").run()  # Sunday is already long
+    assert any("Only one long-run day" in e.value for e in at.error)
+    assert next(b for b in at.button if b.label == "Save settings").disabled

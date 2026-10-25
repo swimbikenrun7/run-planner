@@ -58,7 +58,9 @@ hasn't seen it running yet. The user hasn't set up Tailscale yet either.
 ## Plan page (built 2026-10-24, branch `plan-page`)
 
 The page has four sections:
-1. Plan and race: plan, race date, `plan_tag` and the plan's rest-day fill, saved to Config and Plans.
+1. Plan, race and your week: plan, race date and `plan_tag`; the Week template as one dropdown per day
+   ((open) / long / quality / a fixed Library workout); the plan's rest-day fill; and the Config layout
+   rules in an expander. All of it is saved with one button, and layout always reads the saved values.
 2. Lay out: options appear as cards when the plan doesn't fit, and choosing one rewrites Week.
 3. Calendar: a colour-coded week grid.
 4. Check against Intervals (the dry run), then Push behind a confirmation checkbox.
