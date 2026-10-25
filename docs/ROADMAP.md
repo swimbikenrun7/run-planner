@@ -52,6 +52,12 @@ layout already places a plan backward from a race date:
 The training rules are the user's to define before building: recovery length by race distance,
 the base-week mix, and the mileage ramp.
 
+**6. Proposed: refresh.** (Not started; the user's idea, 2026-10-25.) Replanning a gap under way
+already starts from today's actual fitness and current threshold. Still missing: a check of how
+actual fitness and form are tracking against what was pushed, and a knob to make the rest of the
+filler harder or easier from that (or from how he feels). Threshold pace isn't forecast: no
+reliable model, so the plan follows it when he updates it in Intervals (see FITNESS.md).
+
 **Later:**
 - Triathlon plans (see HANDOFF backlog).
 - If the Library gets large, move the data to SQLite with an export to the workbook. Not

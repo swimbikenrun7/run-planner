@@ -221,3 +221,42 @@ def test_race_distance_is_saved_on_the_plans_tab(workbook):
     assert any("race distance" in c.value for c in at.caption)  # named as unsaved
     at = click(at, "Save settings")
     assert sheet(workbook, "Plans")[0][8] == "half"
+
+
+class CrowdedIntervals(FakeIntervals):
+    """Another plan ends where this one starts, and gap filler covers the rest of its dates."""
+
+    def list_events(self, oldest, newest):
+        days = [RACE - timedelta(days=k) for k in (14, 12, 11)]
+        fill = [RACE - timedelta(days=k) for k in range(1, 11)]
+        return super().list_events(oldest, newest) + [
+            {"external_id": f"old-{d}", "start_date_local": f"{d}T00:00:00", "icu_training_load": 40} for d in days
+        ] + [{"external_id": f"fill-2026-01-01-{d}", "start_date_local": f"{d}T00:00:00", "icu_training_load": 40}
+             for d in fill]
+
+
+def test_overlapping_plan_needs_a_choice_and_filler_is_replaced(workbook, monkeypatch):
+    fake = CrowdedIntervals()
+    monkeypatch.setattr(push, "client_from_env", lambda: fake)
+    at = click(click(page(), "Lay out"), "Check against Intervals")
+    assert any("gap-filler workouts" in m.value for m in at.info)
+    at.checkbox(key="confirm").check().run()
+    assert next(b for b in at.button if b.label == "Push").disabled  # keep or replace old first
+    at.radio(key="overlap_old").set_value("keep").run()
+    at = click(at, "Push")
+    assert "Fill gaps page" in at.success[0].value
+    sent = {e["start_date_local"][:10] for e in fake.upserted}
+    assert not sent & {str(RACE - timedelta(days=k)) for k in (12, 11)}  # old keeps its days
+    assert not any(x.startswith("old-") for x in fake.deleted)
+    assert sum(x.startswith("fill-") for x in fake.deleted) == 10
+
+
+def test_replacing_an_overlapping_plan_deletes_its_workouts_in_this_plans_dates(workbook, monkeypatch):
+    fake = CrowdedIntervals()
+    monkeypatch.setattr(push, "client_from_env", lambda: fake)
+    at = click(click(page(), "Lay out"), "Check against Intervals")
+    at.radio(key="overlap_old").set_value("replace").run()
+    at.checkbox(key="confirm").check().run()
+    at = click(at, "Push")
+    assert sorted(x for x in fake.deleted if x.startswith("old-")) == [
+        f"old-{RACE - timedelta(days=k)}" for k in (12, 11)]  # its day before this plan stays

@@ -56,7 +56,7 @@ python import_plan.py prompt plans/plan_builder.xlsx    # writes imports/prompt.
 python import_plan.py stage  plans/plan_builder.xlsx imports/<plan>.csv
 python import_plan.py apply  plans/plan_builder.xlsx --plan <name> --week-end sun   # or --library-only
 python layout.py plans/plan_builder.xlsx [--option N]
-python push.py   plans/plan_builder.xlsx --dry-run
+python push.py   plans/plan_builder.xlsx --dry-run [--overlap keep|replace]
 python -m pytest
 ```
 
@@ -150,6 +150,15 @@ his values.
 - **Building:** fitness ramp at most 5 a week; weekly load at most +10% on the last build week; the
   long run at most one step longer (1 mi / 5 min); a lighter week at 70% after every 3 build weeks;
   1 quality session per build week (tempo, threshold, interval); never planned into high risk.
+- **Filler gives way** (user): filler is tagged `fill-<first day>`. Pushing a plan replaces the filler in
+  its dates (first workout to race) without asking; the gaps around it are then refilled on the Fill
+  gaps page, which flags filler planned before the calendar changed. Refilling a gap replaces all
+  filler in it, whatever its tag.
+- **Plans overlapping plans:** when a plan's dates overlap another pushed plan, the user chooses: keep
+  the other plan (this plan's workouts in its dates aren't sent) or replace it (its workouts in this
+  plan's dates are deleted). Events added by hand in Intervals, races included, are never deleted.
+- **How far ahead:** a gap between two plans is filled whatever its length; with no plan after it, at
+  most 90 days from today.
 - **Between plans:** keep building (the user's goal), or optionally match the next plan's starting
   fitness.
 - **Units:** the filler uses the units of the plan after the gap (else the one before). Workouts
@@ -172,5 +181,7 @@ new. ID collisions are renamed with `-2`, never overwritten.
   `start_date_local`, `name`, `description` (workout text), `external_id = "<plan_tag>-<date>"`.
   Upsert matches on external_id, so re-pushing updates in place.
 - `GET /events?oldest=&newest=` returns `external_id` (verified by the user).
-- `PUT /events/bulk-delete` with `[{"external_id": ...}]`. Push deletes only *future* events
-  with this plan_tag whose dates no longer have a workout. Past events are history: never deleted.
+- `PUT /events/bulk-delete` with `[{"external_id": ...}]`. Push deletes only *future* events:
+  this plan_tag's whose dates no longer have a workout, filler in the plan's dates, and an
+  overlapping plan's workouts when the user chose to replace it (`push.overlaps`, `push.resolve`).
+  Past events are history: never deleted.

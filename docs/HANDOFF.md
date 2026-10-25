@@ -94,8 +94,20 @@ On the user's data, the Nov 27 to Feb 7 gap builds fitness from about 41 to 64: 
 about 300 to 590, 5 to 9 hours. That's above Higdon's week-1 level (about 44), and the page says
 so. Higdon's projected race-day form is +1 (grey).
 
-**Not done yet:** the master workbook needs `setup_workbook.py` for the `race_distance` column.
+**Not done yet:** the master workbook needs `setup_workbook.py` for the `race_distance` column (merged to main 2026-10-25).
 Nothing has been pushed from this page.
+
+## Plans and filler on one calendar (built 2026-10-25, branch `plan-overlap`)
+
+- **Plan page check:** filler in the plan's dates is listed and replaced on push, with a reminder to
+  refill the gaps around the plan. An overlapping plan gets a keep / replace choice; Push stays off
+  until it's made. Events added by hand are listed and left alone. The race-day projection leaves out
+  the filler being replaced. CLI: `push.py --overlap keep|replace`.
+- **Fill gaps page:** each gap says whether it's filled, filled to a date, or out of date (filler
+  pushed before a plan landed in it). Refilling a gap deletes all filler in it, whatever its tag. A
+  gap with no plan after it fills at most 90 days ahead; one starting later says when it can be filled.
+- On the user's calendar today: no overlaps (Higdon dry run: 83 to send, 0 to delete), gaps
+  "Nov 27 to Feb 7: not filled" and "May 3 onward: fills from Feb 2".
 
 ## Unverified or open
 

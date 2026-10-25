@@ -12,6 +12,8 @@ from planlib import to_date
 MIN_GAP_DAYS = 7  # shorter stretches with nothing planned are rest days, not gaps
 TAG_DATE = re.compile(r"^(.*)-(\d{4}-\d{2}-\d{2})$")
 MANUAL = "(added in Intervals)"
+FILL_PREFIX = "fill-"  # gap filler's plan_tags: fill-<first day of the gap>
+FILL_AHEAD_DAYS = 90  # with no plan after a gap, fill at most this far from today (user)
 
 
 def tag_of(event):
@@ -68,3 +70,27 @@ def gaps(planned, start, end, min_days=MIN_GAP_DAYS):
             run = None
         d += timedelta(days=1)
     return out
+
+
+def fill_status(events, first, last, today):
+    """How the filler in the gap [first, last] stands: (status, filled_to).
+
+    status is "empty", "filled", "partly" (filled to filled_to, e.g. an open-ended gap whose
+    90 days have moved on) or "outdated" (filler from before the calendar changed around it:
+    a plan pushed into it, so it no longer starts on the gap's first day). A gap already under way
+    starts today, so its filler's tag can be earlier.
+    """
+    fill = [(to_date(e["start_date_local"]), tag_of(e)) for e in events if tag_of(e).startswith(FILL_PREFIX)]
+    fill = [(d, t) for d, t in fill if first <= d <= last]
+    if not fill:
+        return "empty", None
+    filled_to = max(d for d, _ in fill)
+    if any(not fill_tag_fits(t, first, today) for _, t in fill):
+        return "outdated", filled_to
+    return ("filled" if filled_to >= last else "partly"), filled_to
+
+
+def fill_tag_fits(tag, first, today):
+    """Whether filler tagged `tag` was planned for a gap starting on `first`."""
+    start = tag[len(FILL_PREFIX):]
+    return start == first.isoformat() or (first <= today and start < first.isoformat())
