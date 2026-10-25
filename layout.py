@@ -76,6 +76,16 @@ def selected_plan(config, sheets):
     return name, week_end, rows
 
 
+def plan_fill(sheets, name, library):
+    """The plan's (rest_fill, pre_race_fill) workout ids from the Plans tab; None = keep rest days."""
+    row = next(r for r in sheets.get("plans", []) if str(r.get("plan") or "").strip() == name)
+    fill = tuple(None if blank(row.get(k)) else str(row[k]).strip() for k in ("rest_fill", "pre_race_fill"))
+    bad = [w for w in fill if w and w not in library]
+    if bad:
+        raise PlanError(f"Plans tab {name}: rest-day fill {', '.join(bad)} not in Library")
+    return fill
+
+
 def plan_items(race_date, week_end, library, rows):
     """Schedule rows -> items with a naive date (same position relative to the race)."""
     errors, cells = [], {}
@@ -241,6 +251,19 @@ def place(ctx, week, allow_pre_long, off_template=None):
         if d not in placed:
             placed[d] = rest.get(d) or {"wid": None, "category": "rest", "source_day": "", "note": None, "naive": d}
     return placed, unplaced
+
+
+def fill_rest_days(ctx, placed, rest_fill, pre_race_fill):
+    """Rest days left after placement become easy runs; the day before the race gets pre_race_fill."""
+    for d in ctx.days:
+        item = placed[d]
+        if item["wid"] or d == ctx.race_date:
+            continue
+        wid = pre_race_fill if d == ctx.race_date - ONE else rest_fill
+        if wid:
+            was = f" (plan: {item['note']})" if item.get("note") else ""
+            placed[d] = {"wid": wid, "category": category_of(ctx.library, wid), "source_day": "(rest fill)",
+                         "note": f"rest day filled{was}", "naive": d}
 
 
 def violations(ctx, placed, allow_pre_long):
@@ -483,6 +506,7 @@ def main(argv=None, today=None):
             raise PlanError("Config is missing race_date")
         race_date = to_date(config["race_date"])
         name, week_end, rows = selected_plan(config, sheets)
+        rest_fill, pre_race_fill = plan_fill(sheets, name, library)
         week = read_week(sheets.get("week", []), library)
         items, last_week = plan_items(race_date, week_end, library, rows)
     except PlanError as e:
@@ -521,6 +545,7 @@ def main(argv=None, today=None):
             save_week(wb, week, allow)
         placed, unplaced = place(ctx, week, allow)
 
+    fill_rest_days(ctx, placed, rest_fill, pre_race_fill)
     rows = layout_rows(ctx, placed, unplaced, allow)
     write_layout(wb, rows)
     if OPTIONS_SHEET in wb.sheetnames:

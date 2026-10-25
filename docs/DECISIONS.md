@@ -39,3 +39,7 @@ Anything marked (user) is the user's call; change it only with him.
 16. **Back-to-back hard days are never allowed, except a plan's deliberate pre-long-run session**
     (e.g. Higdon's Saturday pace run before Sunday's long run), and only when `allow_pre_long` is on.
 17. **Dates before today are laid out but never pushed, and past events are never deleted.**
+18. **Rest days become easy runs** (user). He runs every day: the plan's rest days get `rest_fill`
+    (3mi or 30m, matching how the plan writes easy runs) and the day before the race a shorter
+    `pre_race_fill` (2mi or 20m). It's a rule per plan on the Plans tab rather than hand overrides,
+    so rerunning layout keeps it.

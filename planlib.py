@@ -1,5 +1,6 @@
 """Shared helpers for layout.py and push.py: workbook reading, days, and plan rules."""
 
+import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -163,3 +164,37 @@ def read_week(rows, library):
     if errors:
         raise PlanError("\n".join(errors))
     return week
+
+
+# ---------- rest-day fill (user: rest days become easy runs, shorter the day before the race) ----------
+
+# (workout_id, name, length) for each kind of plan: (rest_fill, pre_race_fill)
+FILL_WORKOUTS = {
+    "distance": (("EASY-3MI", "Easy 3mi", "3mi"), ("EASY-2MI", "Easy 2mi", "2mi")),
+    "time": (("EASY-30", "Easy 30", "30m"), ("EASY-20", "Easy 20", "20m")),
+}
+LENGTH_UNIT = re.compile(r"\d(mi|km|mtr|h|m|s)$")
+
+
+def easy_run_unit(texts):
+    """'distance' or 'time': how a plan writes its single-step easy runs. Distance on a tie."""
+    units = [LENGTH_UNIT.search(t.strip()) for t in texts if t and " / " not in t]
+    time = sum(1 for m in units if m and m.group(1) in ("h", "m", "s"))
+    distance = sum(1 for m in units if m and m.group(1) in ("mi", "km", "mtr"))
+    return "time" if time > distance else "distance"
+
+
+def plan_easy_texts(workout_ids, library):
+    return [str(library[w].get("workout_text") or "") for w in workout_ids
+            if w in library and str(library[w].get("category") or "").strip().lower() == "easy"]
+
+
+def fill_workouts(unit, easy_target, library):
+    """(rest_fill id, pre_race_fill id, Library rows to add for any that are missing)."""
+    ids, missing = [], []
+    for wid, name, length in FILL_WORKOUTS[unit]:
+        ids.append(wid)
+        if wid not in library:
+            missing.append({"workout_id": wid, "category": "easy", "name": name,
+                            "workout_text": f"- Press lap {easy_target} {length}"})
+    return ids[0], ids[1], missing

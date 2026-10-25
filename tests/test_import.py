@@ -153,7 +153,9 @@ def workbook(config_plan="old"):
     wb.active.title = "Config"
     for name, rows in {"Config": [["key", "value"], ["plan", config_plan]],
                        "Library": [["workout_id", "category", "name", "workout_text"]],
-                       "Plans": [["plan", "source_week_end", "notes"], ["old", "sun", None]],
+                       "Paces": [["key", "description", "target"], ["E", "", "80% Pace"]],
+                       "Plans": [["plan", "source_week_end", "notes", "rest_fill", "pre_race_fill"],
+                                 ["old", "sun", None, None, None]],
                        "Schedule": [["plan", "week", "day", "workout_id", "note"], ["old", 1, "Mon", "X", None]],
                        "Layout": [["date"]]}.items():
         ws = wb[name] if name in wb.sheetnames else wb.create_sheet(name)
@@ -178,3 +180,25 @@ def test_saving_and_selecting_a_plan_replaces_the_old_layout():
     wb = workbook()
     apply_to_workbook(wb, NEW, SCHED, "new", "sun")
     assert wb["Config"]["B2"].value == "new" and "Layout" not in wb.sheetnames
+
+
+def plans_row(wb, plan):
+    return next(r for r in wb["Plans"].iter_rows(values_only=True) if r[0] == plan)
+
+
+def test_new_plan_gets_rest_fill_in_its_own_units():
+    wb = workbook()
+    apply_to_workbook(wb, NEW, SCHED, "miles", "sun", select=False)  # E3 is written in miles
+    assert plans_row(wb, "miles")[3:5] == ("EASY-3MI", "EASY-2MI")
+    by_time = [{**NEW[0], "workout_id": "E30", "workout_text": "- Press lap 80% Pace 30m"}]
+    apply_to_workbook(wb, by_time, [{**SCHED[0], "workout_id": "E30"}], "minutes", "sun", select=False)
+    assert plans_row(wb, "minutes")[3:5] == ("EASY-30", "EASY-20")
+    library = {r[0]: r for r in wb["Library"].iter_rows(min_row=2, values_only=True)}
+    assert library["EASY-20"][3] == "- Press lap 80% Pace 20m"  # added, from the Paces E target
+
+
+def test_reimporting_a_plan_keeps_the_users_rest_fill_choice():
+    wb = workbook()
+    wb["Plans"]["D2"].value = wb["Plans"]["E2"].value = None  # user cleared: keep rest days
+    apply_to_workbook(wb, NEW, SCHED, "old", "sun", select=False)
+    assert plans_row(wb, "old")[3:5] == (None, None)

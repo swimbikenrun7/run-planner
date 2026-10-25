@@ -18,7 +18,17 @@ import sys
 import openpyxl
 from openpyxl.styles import Font
 
-from planlib import DAYS, PlanError, last_used_row, read_table, save_workbook, to_date
+from planlib import (
+    DAYS,
+    PlanError,
+    easy_run_unit,
+    fill_workouts,
+    last_used_row,
+    plan_easy_texts,
+    read_table,
+    save_workbook,
+    to_date,
+)
 
 # Daniels VDOT relationships, as % of threshold SPEED (Intervals.icu uses % of speed)
 PACES = [
@@ -126,11 +136,46 @@ def setup(wb):
         changes.append("added Plans tab")
         add_config(cfg, "plan", "legacy" if has_rows else None, changes, "the plan to lay out")
 
+    add_rest_fill(wb, changes)
+
     add_config(cfg, "plan", None, changes, "the plan to lay out")
     add_config(cfg, "taper_days", 2, changes)
     add_config(cfg, "long_run_gap", 5, changes, "no long run within this many days of the race")
     add_config(cfg, "allow_pre_long", "no", changes)
     return changes
+
+
+def add_rest_fill(wb, changes):
+    """Add rest_fill / pre_race_fill to Plans, filled for existing plans in their own units."""
+    plans = wb["Plans"]
+    headers = [str(c.value or "").strip().lower() for c in plans[1]]
+    if "rest_fill" in headers:
+        return
+    library = {str(r["workout_id"]).strip(): r for r in read_table(wb["Library"])}
+    easy = {str(r["key"]).strip().upper(): r["target"] for r in read_table(wb["Paces"])}.get("E")
+    schedule = read_table(wb["Schedule"])
+    col = len([h for h in headers if h]) + 1
+    for c, name in ((col, "rest_fill"), (col + 1, "pre_race_fill")):
+        plans.cell(1, c, name).font = ARIAL_BOLD
+        plans.column_dimensions[plans.cell(1, c).column_letter].width = 14
+    for r in range(2, last_used_row(plans) + 1):
+        plan = str(plans.cell(r, 1).value or "").strip()
+        if not plan:
+            continue
+        ids = [str(s["workout_id"]).strip() for s in schedule
+               if str(s.get("plan") or "").strip() == plan and s.get("workout_id")]
+        rest_fill, pre_race_fill, missing = fill_workouts(
+            easy_run_unit(plan_easy_texts(ids, library)), str(easy).strip(), library)
+        plans.cell(r, col, rest_fill).font = ARIAL
+        plans.cell(r, col + 1, pre_race_fill).font = ARIAL
+        for m in missing:
+            row = last_used_row(wb["Library"]) + 1
+            for c, v in enumerate([m["workout_id"], m["category"], m["name"], m["workout_text"]], start=1):
+                wb["Library"].cell(row, c, v).font = ARIAL
+            library[m["workout_id"]] = m
+            changes.append(f"added {m['workout_id']} to Library")
+        changes.append(f"Plans {plan}: rest days filled with {rest_fill}, {pre_race_fill} the day before "
+                       f"the race (clear both cells to keep rest days)")
 
 
 def main(argv=None):

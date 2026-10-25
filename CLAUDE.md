@@ -90,7 +90,7 @@ Schedule[Config.plan] + Week --layout--> Layout tab (or Options tab) --push--> I
 | Library | `workout_id`, `category`, `name`, `workout_text`. Grows forever; never overwrite an entry |
 | Paces | `key`, `description`, `target` (see pace table below) |
 | Week | `day`, `role` (`long`/`quality`/`fixed`/`easy`), `workout_id` (for fixed days) |
-| Plans | `plan`, `source_week_end`, `notes` |
+| Plans | `plan`, `source_week_end`, `notes`, `rest_fill`, `pre_race_fill` (blank = keep rest days) |
 | Schedule | `plan`, `week`, `day`, `workout_id`, `note`: each plan in its own week convention |
 | Layout | generated: one row per date; rows with no date are sessions that couldn't be placed |
 | Import / Import Schedule / Options | transient review tabs, removed when their step completes |
@@ -129,6 +129,12 @@ back-to-back hard days except the plan's pre-long-run session the day before the
 engine **advises instead of improvising**: it writes nothing, lists options (current week plus
 the best change of each kind: keep the long day / keep fixed days / move the long day), and the
 user picks with `--option N`, which rewrites the Week tab.
+
+**Rest-day fill** (user): the user doesn't take rest days. After placement, every rest day left
+becomes the plan's `rest_fill` and the day before the race its `pre_race_fill`. These are
+`EASY-3MI`/`EASY-2MI` for plans that write easy runs in distance and `EASY-30`/`EASY-20` for
+time, detected when a plan is first imported and editable on the Plans tab. Re-importing keeps
+his values.
 
 **Matching on import:** exact (identical text, ignoring case and spacing) reuses the Library
 ID; similar (multi-step, same category, same main set or same structure with different

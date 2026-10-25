@@ -30,8 +30,11 @@ from planlib import (
     PlanError,
     blank,
     day_index,
+    easy_run_unit,
+    fill_workouts,
     last_used_row,
     load_workbook_tables,
+    plan_easy_texts,
     read_table,
     save_workbook,
 )
@@ -500,13 +503,32 @@ def save_plan_rows(wb, plan, week_end, sched, source):
         append_row(ws, row)
 
     plans = wb["Plans"]
+    pcols = [str(c.value or "").strip().lower() for c in plans[1]]
+    if "rest_fill" not in pcols or "pre_race_fill" not in pcols:
+        raise ImportError_("Plans tab has no rest_fill columns: run setup_workbook.py first")
     found = False
     for r in range(2, last_used_row(plans) + 1):
         if str(plans.cell(r, 1).value or "").strip() == plan:
             plans.cell(r, 2).value = week_end
-            found = True
+            found = True  # keeps the user's rest_fill choices
     if not found:
-        append_row(plans, [plan, week_end, source])
+        rest_fill, pre_race_fill = choose_fill(wb, [s["workout_id"] for s in sched if s["workout_id"]])
+        values = {"plan": plan, "source_week_end": week_end, "notes": source,
+                  "rest_fill": rest_fill, "pre_race_fill": pre_race_fill}
+        append_row(plans, [values.get(h) for h in pcols])
+
+
+def choose_fill(wb, workout_ids):
+    """Rest-day fill for a new plan, in the plan's own units; adds missing fill workouts to Library."""
+    library = {str(r["workout_id"]).strip(): r for r in read_table(wb["Library"])}
+    easy = {str(r["key"]).strip().upper(): r["target"] for r in read_table(wb["Paces"])}.get("E")
+    if blank(easy):
+        raise ImportError_("Paces tab has no E target")
+    unit = easy_run_unit(plan_easy_texts(workout_ids, library))
+    rest_fill, pre_race_fill, missing = fill_workouts(unit, str(easy).strip(), library)
+    for r in missing:
+        append_row(wb["Library"], [r["workout_id"], r["category"], r["name"], r["workout_text"]])
+    return rest_fill, pre_race_fill
 
 
 def set_config(wb, key, value):

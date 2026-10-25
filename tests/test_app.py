@@ -36,7 +36,8 @@ def workbook(tmp_path, monkeypatch):
         "Library": [["workout_id", "category", "name", "workout_text"],
                     ["EASY-3MI", "easy", "Easy 3mi", "- Press lap 80% Pace 3mi"],
                     ["RACE", "race", "Race Day", None]],
-        "Plans": [["plan", "source_week_end", "notes"], ["old", "sun", None]],
+        "Plans": [["plan", "source_week_end", "notes", "rest_fill", "pre_race_fill"],
+                  ["old", "sun", None, None, None]],
         "Schedule": [["plan", "week", "day", "workout_id", "note"], ["old", 1, "Mon", "EASY-3MI", None]],
         "Layout": [["date"]],
     }
@@ -78,6 +79,7 @@ def test_check_then_save_as_a_plan_without_selecting_it(workbook):
     at.text_input[0].input("test-plan").run()
     at.button[1].click().run()
     assert not at.exception and "Saved plan **test-plan**" in at.success[0].value
+    assert "filled with **EASY-3MI** (**EASY-2MI**" in at.success[0].value
     wb = openpyxl.load_workbook(workbook)
     assert "INT-TEST" in [r[0] for r in wb["Library"].iter_rows(values_only=True)]
     assert {r[0] for r in wb["Schedule"].iter_rows(min_row=2, values_only=True)} == {"old", "test-plan"}

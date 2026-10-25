@@ -57,14 +57,11 @@ hasn't seen it running yet. The user hasn't set up Tailscale yet either.
 
 ## Unverified or open
 
-- **Layout fixed 2026-10-24; the saved Layout has 4 easy runs the plan doesn't.** Two bugs were
-  fixed in `place()`: the plan's rest days now give way to displaced easy runs, and a displaced
-  easy run stays in its own plan week instead of drifting to the earliest open day in the
-  whole plan. Rerun on a copy, the Layout now matches the plan week for week. The saved Layout
-  (the one the dry run used) also has easy runs on rest days in weeks 3, 6, 9 and 12 (Sun Feb 28,
-  Mar 21, Apr 11, and both Fri Apr 30 and Sat May 1 in race week). **The user confirmed they
-  are his own edits.** Rerunning layout on the master workbook would remove them, so don't. The
-  Plan page needs a way to keep hand changes across reruns (see ROADMAP).
+- **Rest-day fill rule (branch `rest-fill`)** replaces the user's hand edits to the Layout. On
+  a copy of the master workbook, rerunning layout with the rule matches his hand-edited Layout
+  on 83 of 84 days. The exception is race-week Friday Apr 30: the rule gives 2mi (the plan's own
+  displaced Wednesday 2mi lands there), where his edit had 3mi. Ask whether that matters.
+  `setup_workbook.py` detected `turkey-trot-10k` as a time-based plan (`EASY-30`/`EASY-20`).
 - **Hill steps with no pace target** (`- Uphill hard 90s`): not yet seen on the watch. Push one
   hill workout and have the user check it before relying on the format.
 - **The user's older Library entries use pre-convention paces** (tempo 95%, threshold 105%,

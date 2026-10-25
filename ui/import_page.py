@@ -12,7 +12,7 @@ from import_plan import (
     parse_pace,
     stage_plan,
 )
-from planlib import DAYS, PlanError, blank, load_workbook_tables, save_workbook
+from planlib import DAYS, PlanError, blank, load_workbook_tables, read_table, save_workbook
 from ui.common import sidebar, workbook_path
 
 MATCH_ORDER = {"similar": 0, "new": 1, "exact": 2}  # rows that need a decision first
@@ -52,6 +52,7 @@ def save(rows, plan, week_end, select):
         new_rows, sched = apply_import(current_library, rows, st.session_state.staged["schedule"])
         apply_to_workbook(wb, new_rows, sched, plan, week_end, "imported in the app", select)
         save_workbook(wb, path)
+        fill = next((r for r in read_table(wb["Plans"]) if str(r.get("plan") or "").strip() == (plan or "").strip()), {})
     except (ImportError_, PlanError) as e:
         st.session_state.save_error = str(e)
         return
@@ -61,6 +62,9 @@ def save(rows, plan, week_end, select):
         done += f" Saved plan **{plan.strip()}** ({len(sched)} days, weeks end {week_end.title()})."
         done += (" It's now the selected plan in Config." if select
                  else " Config's selected plan is unchanged.")
+        if fill.get("rest_fill"):
+            done += (f" Rest days will be filled with **{fill['rest_fill']}** (**{fill.get('pre_race_fill')}** "
+                     f"the day before the race); change or clear them on the Plans tab.")
     st.session_state.done = done
     for key in ("staged", "errors", "save_error", "csv_text"):
         st.session_state.pop(key, None)

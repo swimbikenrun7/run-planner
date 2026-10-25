@@ -2,7 +2,17 @@ from datetime import date, timedelta
 
 import pytest
 
-from layout import Context, future_hard, layout_rows, place, plan_items, selected_plan, suggest, violations
+from layout import (
+    Context,
+    fill_rest_days,
+    future_hard,
+    layout_rows,
+    place,
+    plan_items,
+    selected_plan,
+    suggest,
+    violations,
+)
 from planlib import PlanError
 
 RACE = date(2027, 5, 2)  # a Sunday
@@ -17,6 +27,8 @@ LIBRARY = {
     "PACE": {"category": "tempo", "name": "HM pace"},
     "TUNE": {"category": "tuneup", "name": "5K race"},
     "RACE": {"category": "race", "name": "Race"},
+    "E3": {"category": "easy", "name": "Easy 3mi"},
+    "E2": {"category": "easy", "name": "Easy 2mi"},
 }
 DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
@@ -134,3 +146,22 @@ def test_rest_days_give_way_to_displaced_easy_runs():
         days = [d for d in ctx.days if ctx.block(d) == wk]
         assert sum(placed[d]["wid"] == "EASY" for d in days) == sum(
             i["wid"] == "EASY" for i in ctx.items if i["week"] == wk)
+
+
+def test_rest_days_filled_with_a_shorter_run_the_day_before_the_race():
+    ctx = ctx_for([HIGDON_WEEK, RACE_WEEK])  # rest on both Fridays and race-week Saturday
+    tpl = week_tpl(sun="long", tue="quality", thu="quality", sat="quality")
+    placed, _ = place(ctx, tpl, True)
+    fill_rest_days(ctx, placed, "E3", "E2")
+    assert all(i["wid"] for i in placed.values())  # no rest days left
+    assert placed[RACE - timedelta(days=1)]["wid"] == "E2"
+    assert placed[RACE - timedelta(days=2)]["wid"] == "E3"
+    assert placed[RACE - timedelta(days=2)]["source_day"] == "(rest fill)"
+    assert not violations(ctx, placed, True)
+
+
+def test_blank_fill_keeps_rest_days():
+    ctx = ctx_for([HIGDON_WEEK, RACE_WEEK])
+    placed, _ = place(ctx, week_tpl(sun="long", tue="quality", thu="quality", sat="quality"), True)
+    fill_rest_days(ctx, placed, None, None)
+    assert placed[RACE - timedelta(days=1)]["wid"] is None
