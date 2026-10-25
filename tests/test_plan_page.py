@@ -150,8 +150,27 @@ def test_week_dropdowns_and_rules_are_saved_and_used_by_layout(workbook):
     assert {r[3] for r in rows if r[1] == "Sat" and r[0]} <= {"LONG", "EASY-2MI"}  # long day (shakeout before race)
 
 
+def test_unsaved_changes_explain_why_the_check_is_locked(workbook):
+    at = page()
+    at.text_input[0].input("t2").run()
+    assert next(b for b in at.button if b.label == "Check against Intervals").disabled
+    assert any("changes that aren't saved" in i.value for i in at.info)
+
+
 def test_two_long_days_cannot_be_saved(workbook):
     at = page()
     at.selectbox(key="day5").select("long").run()  # Sunday is already long
     assert any("Only one long-run day" in e.value for e in at.error)
     assert next(b for b in at.button if b.label == "Save settings").disabled
+
+
+def test_after_choosing_an_option_you_can_go_straight_to_the_check(workbook):
+    make_workbook(workbook, {"Tue": "quality", "Sun": "long"}, "no")  # hard sessions won't fit
+    at = click(page(), "Lay out")
+    at.button(key="pick1").click().run()
+    assert "Week tab was updated" in at.success[0].value
+    saved = {r[0]: r[1] for r in sheet(workbook, "Week")}
+    assert [at.selectbox(key=f"day{d}").value or "easy" for d in range(7)] == \
+        [saved[d] if saved[d] != "fixed" else None for d in ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]]
+    assert next(b for b in at.button if b.label == "Save settings").disabled  # nothing unsaved
+    assert not next(b for b in at.button if b.label == "Check against Intervals").disabled

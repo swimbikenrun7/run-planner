@@ -93,6 +93,10 @@ def lay_out(option=None):
         return
     st.session_state.pop("picks", None)
     error = saving(lambda wb: write_result(wb, result))
+    if result["week_change"] and not error:
+        # the option rewrote the Week tab (and allow_pre_long): show the saved values in section 1
+        for key in [f"day{d}" for d in range(7)] + ["allow_pre_long"]:
+            st.session_state.pop(key, None)
     changed = " Your Week tab was updated to the chosen option." if result["week_change"] else ""
     st.session_state.message = ("error", error) if error else ("success", f"Layout written.{changed}")
 
@@ -213,7 +217,7 @@ with st.expander("Layout rules"):
     new["long_run_gap"] = r2.number_input("No long run within N days of the race", 0, 21, saved_rules["long_run_gap"])
     new["allow_pre_long"] = "yes" if st.toggle(
         "Allow the plan's session the day before the long run (back-to-back hard days)",
-        value=saved_rules["allow_pre_long"] == "yes") else "no"
+        value=saved_rules["allow_pre_long"] == "yes", key="allow_pre_long") else "no"
     new["long_run_days"] = ", ".join(st.multiselect(
         "Days the long run may move to when layout suggests options", DAYS,
         default=saved_rules["long_run_days"].split(", "), format_func=str.title))
@@ -277,6 +281,9 @@ else:
 
 # ---------- 4. push ----------
 st.subheader("4. Push to Intervals.icu")
+if dirty:
+    st.info("Section 1 has changes that aren't saved. Save them and lay out again, or set them back, "
+            "so the check matches what you see.")
 st.button("Check against Intervals", on_click=check, disabled=not layout_rows or dirty,
           help="Dry run: reads your Intervals calendar and shows what a push would do. Sends nothing.")
 preview = st.session_state.get("preview")
