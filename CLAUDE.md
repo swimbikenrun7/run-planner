@@ -17,7 +17,7 @@ and `docs/DECISIONS.md` before changing anything a decision there covers.
   to `main` and before any `git push`.** The user owns final acceptance.
 - **Evidence over claims.** Show test output, a dry run, or the generated Layout rather than
   saying something works.
-- **Never run `push.py` without `--dry-run` unless the user explicitly asks.** It writes to
+- **Never run `push.py` without `--dry-run`, or press Push in the app, unless the user explicitly asks.** It writes to
   his live Intervals.icu calendar (and his watch). `--dry-run` with `.env` present is safe:
   it only reads.
 - **Don't modify `plans/plan_builder.xlsx` for experiments.** It's the user's master workbook
@@ -50,7 +50,7 @@ and `docs/DECISIONS.md` before changing anything a decision there covers.
 ## Commands
 
 ```bash
-streamlit run app.py                                    # the app (Import page), on localhost:8501
+streamlit run app.py                                    # the app (Plan, Import pages), on localhost:8501
 python setup_workbook.py plans/plan_builder.xlsx        # idempotent: adds tabs/keys the code needs
 python import_plan.py prompt plans/plan_builder.xlsx    # writes imports/prompt.md for a Claude chat
 python import_plan.py stage  plans/plan_builder.xlsx imports/<plan>.csv
@@ -67,8 +67,8 @@ python -m pytest
 | `app.py`, `ui/` | Streamlit app over the workbook. Pages call the same functions as the scripts; `RUN_PLANNER_WORKBOOK` points it at a copy |
 | `planlib.py` | Shared: workbook reading (`read_table`, `last_used_row`), `save_workbook` (lock check), days, Config helpers, `read_week`, `rule_violations` |
 | `import_plan.py` | prompt → stage → apply (`build_prompt`, `parse_csv`, `stage_plan`, `apply_import`, `apply_to_workbook`). Pace keys to targets, workout validation, Library matching, named plans |
-| `layout.py` | Places the selected plan on dates around the Week template; suggests structural options when it doesn't fit |
-| `push.py` | Layout → Intervals.icu events (bulk upsert), deletes stale future events |
+| `layout.py` | Places the selected plan on dates around the Week template; suggests structural options when it doesn't fit (`compute_layout`, `write_result`) |
+| `push.py` | Layout → Intervals.icu events (bulk upsert), deletes stale future events (`preview` reads only, `send` writes) |
 | `setup_workbook.py` | Migrates an older workbook: Paces, Week, Plans tabs, Schedule `plan` column, Config keys |
 | `prompts/convert_plan.md` | Conversion prompt template (`{{PACES}}`, `{{OFFSET_UNIT}}`, `{{LIBRARY}}` filled by `prompt`) |
 | `tests/` | One test file per module. Pure logic is tested without the workbook or network; `test_app.py` drives pages headlessly with Streamlit's AppTest on a temporary workbook |

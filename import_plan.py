@@ -541,6 +541,18 @@ def set_config(wb, key, value):
         append_row(cfg, [key, value])
 
 
+def set_plan_fields(wb, plan, values):
+    """Set columns, by header, on one plan's row of the Plans tab."""
+    ws = wb["Plans"]
+    col = {str(c.value or "").strip().lower(): c.column for c in ws[1]}
+    for r in range(2, last_used_row(ws) + 1):
+        if str(ws.cell(r, 1).value or "").strip() == plan:
+            for key, value in values.items():
+                ws.cell(r, col[key]).value = value
+            return
+    raise ImportError_(f"plan {plan!r} is not on the Plans tab")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Import a training plan into plan_builder.xlsx.")
     sub = parser.add_subparsers(dest="command", required=True)

@@ -55,6 +55,18 @@ Verified headlessly on a copy of the master workbook with the Higdon reply (84 d
 matches). A live browser check failed because the browser automation didn't respond, so the user
 hasn't seen it running yet. The user hasn't set up Tailscale yet either.
 
+## Plan page (built 2026-10-24, branch `plan-page`)
+
+The page has four sections:
+1. Plan and race: plan, race date, `plan_tag` and the plan's rest-day fill, saved to Config and Plans.
+2. Lay out: options appear as cards when the plan doesn't fit, and choosing one rewrites Week.
+3. Calendar: a colour-coded week grid.
+4. Check against Intervals (the dry run), then Push behind a confirmation checkbox.
+
+On a copy of the master workbook it reproduces the saved Higdon Layout on all 84 days, and the
+check matches the CLI dry run: 83 workouts, 0 deletions. **Nothing has been pushed for
+`pig-half-2027` yet.** Tests use a fake Intervals client.
+
 ## Unverified or open
 
 - **Rest-day fill rule** replaces the user's hand edits to the Layout. On a copy of the master

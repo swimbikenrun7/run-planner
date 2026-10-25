@@ -26,7 +26,7 @@ Planned tech: **Streamlit** (all Python, no web code). The existing pure functio
 The `main()` functions only print, so the app calls the logic directly. Saves go through
 `planlib.save_workbook`, so the app refuses to write while Calc has the workbook open.
 
-**2. Plan page.**
+**2. Plan page.** Built 2026-10-24 (`ui/plan_page.py`); hand changes are covered by the rest-day rule instead.
 - Pick a plan and set `race_date` and `plan_tag`.
 - Run layout. When the plan doesn't fit the week, the options appear as cards and the user
   clicks one.

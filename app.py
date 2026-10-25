@@ -9,4 +9,7 @@ save goes through planlib.save_workbook, so nothing is written while Calc has th
 import streamlit as st
 
 st.set_page_config(page_title="run-planner", page_icon="🏃", layout="wide")
-st.navigation([st.Page("ui/import_page.py", title="Import a plan", icon="📥")]).run()
+st.navigation([
+    st.Page("ui/plan_page.py", title="Plan", icon="📅"),
+    st.Page("ui/import_page.py", title="Import a plan", icon="📥"),
+]).run()
