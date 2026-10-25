@@ -78,6 +78,25 @@ from the Plans tab, whose `plan_tag`, `race_date` and `pushed` columns are fille
 2026-11-26 filled in once. With real data the gaps are Nov 27, 2026 to Feb 7, 2027 (between the
 plans) and from May 3, 2027 onward: these are what the gap filler (ROADMAP step 5) will fill.
 
+## Gap filler (built 2026-10-24, branch `gap-filler`)
+
+**Fill gaps page:** pick a gap, adjust the training rules (they apply to the preview straight away,
+and "Save rules" makes them the defaults), preview the weeks and the projected fitness, fatigue and
+form, then push behind a confirmation. Each gap's workouts are tagged `fill-<first day>`. Re-planning
+a gap reuses its tag, so the old fill is replaced, and the Fill tab records what was pushed. Easy and
+long runs are sized to the load. They reuse Library workouts with the same category and text and
+otherwise add new ones (never overwriting).
+
+**Plan page:** a race-distance dropdown, and the check now projects race-day form and warns when
+it's short of the target.
+
+On the user's data, the Nov 27 to Feb 7 gap builds fitness from about 41 to 64: weekly load from
+about 300 to 590, 5 to 9 hours. That's above Higdon's week-1 level (about 44), and the page says
+so. Higdon's projected race-day form is +1 (grey).
+
+**Not done yet:** the master workbook needs `setup_workbook.py` for the `race_distance` column.
+Nothing has been pushed from this page.
+
 ## Unverified or open
 
 - **Rest-day fill rule** replaces the user's hand edits to the Layout. On a copy of the master
@@ -104,8 +123,6 @@ plans) and from May 3, 2027 onward: these are what the gap filler (ROADMAP step 
 - **Triathlon plans** (the user has `Tri_Training_Sched.xlsx`). Needs a sport per workout
   (Intervals takes Swim/Ride/Run), more than one workout per day (touches Schedule, Layout,
   and the one-hard-day-per-date assumptions in layout), and cross-sport spacing rules.
-- **Automate the conversion step** with a direct Claude API call instead of copy-paste through
-  a chat. Wait until the prompt is reliable across plan styles.
 - **More suggestion kinds** in layout, e.g. fold HM-pace work into the long run as a fast
   finish (the user considered this for Higdon).
 - The goal race isn't pushed; Intervals has race event categories that could be used.

@@ -160,6 +160,20 @@ class Intervals:
         resp.raise_for_status()
         return resp.json()
 
+    def wellness(self, oldest, newest):
+        """Daily fitness (ctl), fatigue (atl) and ramp rate. Read-only."""
+        resp = requests.get(f"{self.base}/wellness", auth=self.auth, timeout=30,
+                            params={"oldest": oldest.isoformat(), "newest": newest.isoformat()})
+        resp.raise_for_status()
+        return resp.json()
+
+    def run_settings(self):
+        """Threshold pace (m/s) and pace zones (% of threshold) for runs. Read-only."""
+        resp = requests.get(self.base, auth=self.auth, timeout=30)
+        resp.raise_for_status()
+        run = next(s for s in resp.json().get("sportSettings", []) if "Run" in (s.get("types") or []))
+        return {"threshold_speed": run["threshold_pace"], "pace_zones": run["pace_zones"]}
+
     def upsert(self, events):
         resp = requests.post(f"{self.base}/events/bulk", params={"upsert": "true"},
                              auth=self.auth, json=events, timeout=30)
@@ -189,12 +203,13 @@ def preview(config, library, layout, client, today=None):
     today = today or date.today()
     events = build_events(config, library, layout, today)
     out = {"events": events, "warnings": layout_warnings(config, library, layout),
-           "existing": None, "found": None, "stale": []}
+           "existing": None, "found": None, "stale": [], "existing_events": []}
     if client is not None:
         tag = str(config["plan_tag"]).strip()
         last = to_date(config["race_date"])
         existing = client.list_events(today - CLEANUP_WINDOW, last + CLEANUP_WINDOW)
         out["existing"] = len(existing)
+        out["existing_events"] = existing
         out["found"] = sum(1 for e in existing if (e.get("external_id") or "").startswith(f"{tag}-"))
         out["stale"] = stale_ids(existing, events, tag, today)
     return out

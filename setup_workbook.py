@@ -18,6 +18,7 @@ import sys
 import openpyxl
 from openpyxl.styles import Font
 
+from filler import race_distance
 from planlib import (
     DAYS,
     PlanError,
@@ -138,6 +139,7 @@ def setup(wb):
 
     add_rest_fill(wb, changes)
     add_push_record(wb, config, changes)
+    add_race_distance(wb, changes)
 
     add_config(cfg, "plan", None, changes, "the plan to lay out")
     add_config(cfg, "taper_days", 2, changes)
@@ -198,6 +200,22 @@ def add_push_record(wb, config, changes):
             cell = plans.cell(r, col + 1, config.get("race_date"))
             cell.font, cell.number_format = ARIAL, "yyyy-mm-dd"
             changes.append(f"Plans {current}: plan_tag {config.get('plan_tag')}, race_date from Config")
+
+
+def add_race_distance(wb, changes):
+    """Add race_distance (5k / 10k / half / marathon) to Plans, guessed from each plan's name."""
+    plans = wb["Plans"]
+    headers = [str(c.value or "").strip().lower() for c in plans[1]]
+    if "race_distance" in headers:
+        return
+    col = len([h for h in headers if h]) + 1
+    plans.cell(1, col, "race_distance").font = ARIAL_BOLD
+    for r in range(2, last_used_row(plans) + 1):
+        name = plans.cell(r, 1).value
+        if name:
+            guess = race_distance(name)
+            plans.cell(r, col, guess).font = ARIAL
+            changes.append(f"Plans {name}: race_distance {guess or '(unknown: fill in 5k, 10k, half or marathon)'}")
 
 
 def main(argv=None):

@@ -44,3 +44,8 @@ Anything marked (user) is the user's call; change it only with him.
     `pre_race_fill` (2mi or 20m). It's a rule per plan on the Plans tab rather than hand overrides,
     so rerunning layout keeps it. In race week the shortest run goes the day before the race
     ("shortest run last"), so a plan's own 2mi race-week run becomes the shakeout.
+19. **No paid Claude API** (user, 2026-10-24). Plan conversion stays copy-paste through a Claude
+    chat; the "automate conversion" backlog item is closed.
+20. **Form is projected, not guessed.** Intervals' fitness/fatigue are 42-day and 7-day exponential
+    averages of load (verified against the user's data to within 0.4), and planned workouts carry an
+    estimated load, so the app can project form for any plan or filler (see FITNESS.md).

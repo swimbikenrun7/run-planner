@@ -13,4 +13,5 @@ st.navigation([
     st.Page("ui/plan_page.py", title="Plan", icon="📅"),
     st.Page("ui/import_page.py", title="Import a plan", icon="📥"),
     st.Page("ui/calendar_page.py", title="Calendar", icon="🗓️"),
+    st.Page("ui/fill_page.py", title="Fill gaps", icon="🧩"),
 ]).run()
