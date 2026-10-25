@@ -110,9 +110,11 @@ def check():
         if "layout" not in sheets:
             raise PlanError("No Layout tab yet: lay out the plan first")
         client = push.client_from_env()
-        p = push.preview(config, library, sheets["layout"], client)
+        p = push.preview(config, library, sheets["layout"], client, races=push.other_races(sheets))
         if client is not None:
-            p["race_form"] = project_race_day(client, p["existing_events"])
+            replaced = set(p["overlap"]["fill"])  # filler in this plan's dates goes when it's pushed
+            p["race_form"] = project_race_day(client, [e for e in p["existing_events"]
+                                                       if e.get("external_id") not in replaced])
         st.session_state.preview = p
     except PlanError as e:
         st.session_state.message = ("error", str(e))
@@ -140,6 +142,10 @@ def project_race_day(client, existing):
         return f"Couldn't project race-day form: {e}"
 
 
+def overlap_choices(overlap):
+    return {t: st.session_state.get(f"overlap_{t}") for t in overlap["plans"]}
+
+
 def send():
     """Push for real, from a fresh read of the workbook and Intervals."""
     try:
@@ -147,18 +153,21 @@ def send():
         client = push.client_from_env()
         if client is None:
             raise PlanError("Set INTERVALS_ATHLETE_ID and INTERVALS_API_KEY in .env")
-        p = push.preview(cfg, lib, sh["layout"], client)
-        push.send(client, p["events"], p["stale"])
+        p = push.preview(cfg, lib, sh["layout"], client, races=push.other_races(sh))
+        events, deletions = push.resolve(p, str(cfg["plan_tag"]).strip(), overlap_choices(p["overlap"]))
+        push.send(client, events, deletions)
     except PlanError as e:
         st.session_state.message = ("error", str(e))
         return
     except Exception as e:
         st.session_state.message = ("error", f"Push failed: {e}")
         return
-    deleted = f" Deleted {len(p['stale'])} stale events." if p["stale"] else ""
+    deleted = f" Deleted {len(deletions)} events." if deletions else ""
+    if p["overlap"]["fill"]:
+        deleted += " It replaced gap filler, so refill the gaps around it on the Fill gaps page."
     note = saving(lambda wb: push.record_push(wb, cfg))
     noted = f" (Couldn't note it on the Plans tab: {note})" if note else ""
-    st.session_state.message = ("success", f"Pushed {len(p['events'])} workouts to Intervals.icu.{deleted}{noted}")
+    st.session_state.message = ("success", f"Pushed {len(events)} workouts to Intervals.icu.{deleted}{noted}")
     st.session_state.pop("preview", None)
     st.session_state.pop("confirm", None)
 
@@ -363,13 +372,40 @@ if preview:
     events, stale = preview["events"], preview["stale"]
     first, last = (to_date(events[i]["start_date_local"]) for i in (0, -1))
     st.write(f"**{len(events)} workouts** would be sent ({first} to {last}), tagged `{config.get('plan_tag')}`.")
-    if preview["existing"] is None:
+    ready = preview["existing"] is not None
+    if not ready:
         st.warning("No .env credentials, so Intervals wasn't checked and pushing is off.")
     else:
         st.write(f"Intervals has {preview['existing']} events in the window; "
                  f"{preview['found']} already belong to this plan_tag (they'll be updated in place).")
-        if stale:
-            st.warning(f"{len(stale)} future events of this plan would be **deleted**: " + ", ".join(stale))
+        overlap = preview["overlap"]
+        if overlap["fill"]:
+            st.info(f"{len(overlap['fill'])} gap-filler workouts in this plan's dates will be replaced by it. "
+                    "Afterwards, refill the gaps around the plan on the Fill gaps page: the recovery after "
+                    "its race and the build before it start from the new calendar.")
+        for t, o in overlap["plans"].items():
+            st.radio(f"This plan overlaps **{t}** ({o['first']:%b %d} to {o['last']:%b %d}).", ["keep", "replace"],
+                     index=None, key=f"overlap_{t}", format_func=lambda v, t=t, o=o: {
+                         "keep": f"Keep {t}: skip this plan's {o['ours']} workouts in those dates",
+                         "replace": f"Replace it: delete {t}'s {len(o['ids'])} workouts from "
+                                    f"{max(first, date.today()):%b %d} on and push this plan's"}[v])
+        if overlap["manual"]:
+            st.caption("Also on these days, added in Intervals and left alone: "
+                       + "; ".join(f"{d:%b %d} {name}" for d, name in overlap["manual"]))
+        try:
+            events, deletions = push.resolve(preview, str(config["plan_tag"]).strip(),
+                                             overlap_choices(overlap))
+        except PlanError as e:
+            ready = False
+            st.caption(str(e))
+            deletions = stale + overlap["fill"]
+        if deletions:
+            tag = str(config["plan_tag"]).strip()
+            own = [x for x in deletions if x.startswith(f"{tag}-")]
+            parts = [f"{len(own)} of this plan's that are no longer in it ({', '.join(own)})"] if own else []
+            if len(deletions) > len(own):
+                parts.append(f"{len(deletions) - len(own)} gap-filler or replaced-plan workouts")
+            st.warning(f"{len(deletions)} future events would be **deleted**: " + "; ".join(parts) + ".")
         else:
             st.write("Nothing would be deleted.")
     race_form = preview.get("race_form")
@@ -392,5 +428,5 @@ if preview:
                        "workout": e["name"]} for e in events], hide_index=True, width="stretch")
     if preview["existing"] is not None:
         confirm = st.checkbox(f"Send {len(events)} workouts to my Intervals calendar and watch"
-                              + (f" and delete {len(stale)}" if stale else ""), key="confirm")
-        st.button("Push", type="primary", disabled=not confirm, on_click=send)
+                              + (f" and delete {len(deletions)}" if deletions else ""), key="confirm")
+        st.button("Push", type="primary", disabled=not confirm or not ready, on_click=send)

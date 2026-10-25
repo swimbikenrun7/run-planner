@@ -41,3 +41,16 @@ def test_races_added_in_intervals_count_and_manual_events_are_kept():
 
 def test_gap_at_the_end_of_the_range_is_reported():
     assert gaps({D}, D, D + timedelta(days=8)) == [(D + timedelta(days=1), D + timedelta(days=8))]
+
+
+def test_fill_status():
+    from master import fill_status
+    first, last, today = date(2026, 12, 1), date(2026, 12, 20), date(2026, 11, 1)
+    fill = lambda tag, d: {"external_id": f"{tag}-{d}", "start_date_local": f"{d}T00:00:00"}
+    assert fill_status([], first, last, today) == ("empty", None)
+    assert fill_status([fill("fill-2026-12-01", last)], first, last, today) == ("filled", last)
+    assert fill_status([fill("fill-2026-12-01", date(2026, 12, 9))], first, last, today)[0] == "partly"
+    # filler from before a plan was pushed into the middle of it: the gap after the race starts later
+    assert fill_status([fill("fill-2026-11-20", last)], first, last, today)[0] == "outdated"
+    # a gap already under way starts today; its filler was tagged when it began
+    assert fill_status([fill("fill-2026-11-20", last)], first, last, first)[0] == "filled"

@@ -49,3 +49,10 @@ Anything marked (user) is the user's call; change it only with him.
 20. **Form is projected, not guessed.** Intervals' fitness/fatigue are 42-day and 7-day exponential
     averages of load (verified against the user's data to within 0.4), and planned workouts carry an
     estimated load, so the app can project form for any plan or filler (see FITNESS.md).
+21. **Filler gives way to plans; plans ask before replacing plans** (user, 2026-10-25). Filler is
+    disposable: a plan pushed over it replaces it, and the gaps either side are planned again, since
+    their start (recovery after the race) and end depend on the calendar around them. Another plan
+    is the user's commitment, so overlapping one needs his choice: keep it or replace it.
+22. **Filler with no plan after it runs at most 90 days ahead** (user, 2026-10-25). Between two plans
+    the whole gap is filled. Replanning a gap under way starts from today's actual fitness and the
+    current threshold pace, so it doubles as a refresh.

@@ -72,3 +72,20 @@ The proposed defaults were accepted; all of them can be changed on the Fill gaps
 
 **Workout loads:** `fitness.workout_load` matches Intervals' estimate within 1.3 on all 45 distinct
 planned workouts, so the filler can size workouts before they're on the calendar.
+
+## Pace, threshold and load (2026-10-25)
+
+Load is relative to threshold: hours x (% of threshold)^2 x 100. So:
+
+- **Time-based workouts** (30m at 80%) have the same load whatever the threshold.
+- **Distance-based workouts** get a little lighter as threshold improves, because the same miles take
+  less time: 10mi at 80% is about 92 at 6:55/mi threshold and 89 at 6:40/mi.
+- **Running faster than prescribed** raises load: over a fixed distance roughly in proportion to the
+  pace % (5% faster, about 5% more load), over a fixed time with its square (about 10% more).
+- Planned loads use this pace model. Completed activities may be scored from heart rate instead,
+  depending on the athlete's Intervals settings (not checked yet); if so, getting fitter at the same
+  pace scores lower.
+
+Threshold isn't forecast. Garmin's race predictor is an estimate from recent runs, not a forecast,
+and there's no reliable model for how fast threshold will improve. Instead the app follows it: targets
+are % of threshold, and replanning reads the current threshold from Intervals.

@@ -116,3 +116,47 @@ def test_push_records_the_fill_and_adds_new_workouts(workbook, monkeypatch):
 def test_without_credentials_it_says_so(workbook, monkeypatch):
     at = page(monkeypatch, None)
     assert "INTERVALS_API_KEY" in at.error[0].value
+
+
+def test_with_no_plan_after_it_a_gap_is_filled_90_days_ahead(workbook, monkeypatch):
+    at = page(monkeypatch, FakeIntervals())
+    open_gap = at.selectbox[0].options[-1]
+    assert "no plan after it yet (fills to" in open_gap
+    at.selectbox[0].select_index(len(at.selectbox[0].options) - 1).run()
+    assert not at.exception, at.exception
+    at.checkbox(key="fill_confirm").check().run()
+    fake = FakeIntervals()
+    monkeypatch.setattr(push, "client_from_env", lambda: fake)
+    next(b for b in at.button if b.label == "Push").click().run()
+    last = max(date.fromisoformat(e["start_date_local"][:10]) for e in fake.upserted)
+    assert last == TODAY + timedelta(days=90)
+
+
+class FarIntervals(FakeIntervals):
+    """Plan b runs past the 90 days, with nothing after it."""
+
+    def list_events(self, oldest, newest):
+        return [e for e in super().list_events(oldest, newest)] + [
+            {"start_date_local": f"{TODAY + timedelta(days=k)}T00:00:00", "name": "Easy 30", "category": "WORKOUT",
+             "external_id": f"b-{TODAY + timedelta(days=k)}", "icu_training_load": 32} for k in range(80, 101)]
+
+
+def test_a_gap_beyond_90_days_with_no_plan_after_waits(workbook, monkeypatch):
+    at = page(monkeypatch, FarIntervals())
+    at.selectbox[0].select_index(len(at.selectbox[0].options) - 1).run()
+    assert not at.exception, at.exception
+    assert "filled from" in at.info[0].value and not [b for b in at.button if b.label == "Push"]
+
+
+def test_filler_split_by_a_plan_is_flagged_and_replaced(workbook, monkeypatch):
+    old = f"fill-{RACE_A - timedelta(days=20)}"  # pushed before plan a was put on the calendar
+    fake = FakeIntervals(extra=[{"start_date_local": f"{RACE_A + timedelta(days=d)}T00:00:00", "name": "old",
+                                 "category": "WORKOUT", "external_id": f"{old}-{RACE_A + timedelta(days=d)}",
+                                 "icu_training_load": 30} for d in (3, 30)])
+    at = page(monkeypatch, fake)
+    assert "out of date" in at.selectbox[0].format_func(at.selectbox[0].value)
+    assert any("planned before a plan was pushed" in w.value for w in at.warning)
+    at.checkbox(key="fill_confirm").check().run()
+    next(b for b in at.button if b.label == "Push").click().run()
+    assert {e["external_id"][:15] for e in fake.upserted} == {f"fill-{RACE_A + timedelta(days=1)}"}
+    assert sorted(fake.deleted) == [f"{old}-{RACE_A + timedelta(days=d)}" for d in (3, 30)]  # under the old tag

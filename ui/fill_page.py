@@ -11,7 +11,7 @@ from filler import DEFAULT_RULES, DISTANCES, fill, rules_from_config, week_days
 from fitness import ZONES, form_value, project, workout_hours, workout_load
 from forecast import event_loads, plan_races, race_load, start_state
 from import_plan import ImportError_, append_row, set_config
-from master import summarize, tag_of
+from master import FILL_AHEAD_DAYS, FILL_PREFIX, fill_status, fill_tag_fits, summarize, tag_of
 from planlib import (
     DAYS,
     PlanError,
@@ -89,7 +89,7 @@ for race_day, dist, _ in races:
                for e in events):
         loads[race_day] += race_load(dist, paces, speed)
 horizon = today + timedelta(days=540)
-fixed = [e for e in events if not tag_of(e).startswith("fill-")]  # earlier fills can be planned again
+fixed = [e for e in events if not tag_of(e).startswith(FILL_PREFIX)]  # earlier fills can be planned again
 cal = summarize(fixed, {tag: to_date(r["race_date"]) for tag, r in by_tag.items() if not blank(r.get("race_date"))},
                 today, horizon)
 if not cal["gaps"]:
@@ -97,24 +97,48 @@ if not cal["gaps"]:
     st.stop()
 
 
+ahead = today + timedelta(days=FILL_AHEAD_DAYS)
+
+
+def open_ended(gap):
+    return gap[1] >= horizon - timedelta(days=1)
+
+
+def fill_end(gap):
+    """Last day to fill: the day before the next plan, or 90 days from today with no plan after the gap."""
+    return min(gap[1], ahead) if open_ended(gap) else gap[1]
+
+
+STATUS = {"empty": "not filled", "filled": "filled", "partly": "filled to {:%b %d}",
+          "outdated": "filler out of date: the calendar changed around it"}
+
+
 def describe(gap):
     first, last = gap
+    status, filled_to = fill_status(events, first, fill_end(gap), today)
     before = next((r for r in races if r[0] == first - timedelta(days=1)), None)
     after_day = [x for x in cal["days"].get(last + timedelta(days=1), []) if not x["race"]]
-    parts = [f"{first:%b %d, %Y} to {last:%b %d, %Y} ({(last - first).days + 1} days)"]
+    parts = [f"{first:%b %d, %Y} onward" if open_ended(gap)
+             else f"{first:%b %d, %Y} to {last:%b %d, %Y} ({(last - first).days + 1} days)"]
     if before:
         parts.append(f"after the {before[1]} race ({before[2]})")
     if after_day:
         parts.append(f"before {after_day[0]['tag']}")
-    elif last >= horizon - timedelta(days=1):
-        parts.append("no plan after it yet")
-    return ", ".join(parts)
+    elif open_ended(gap):
+        parts.append(f"no plan after it yet (fills to {ahead:%b %d})" if first <= ahead
+                     else f"no plan after it yet (fills from {first - timedelta(days=FILL_AHEAD_DAYS):%b %d})")
+    return ", ".join(parts) + f": {STATUS[status].format(filled_to)}"
 
 
 gap = st.selectbox("Gap", cal["gaps"], format_func=describe)
-first, last = gap
-if last >= horizon - timedelta(days=1):  # open-ended: plan the next 16 weeks
-    last = min(last, first + timedelta(days=16 * 7 - 1))
+first, last = gap[0], fill_end(gap)
+if first > last:
+    st.info(f"With no plan after it, a gap is filled at most {FILL_AHEAD_DAYS} days ahead, so this one can be "
+            f"filled from {first - timedelta(days=FILL_AHEAD_DAYS):%b %d, %Y}. Add a plan after it to fill it now.")
+    st.stop()
+if fill_status(events, first, last, today)[0] == "outdated":
+    st.warning("The filler here was planned before a plan was pushed into it, so its recovery and build "
+               "no longer start in the right place. Push this gap again to replan it around the plan.")
 before = next((r for r in races if r[0] == first - timedelta(days=1)), None)
 next_tag = next((x["tag"] for x in cal["days"].get(gap[1] + timedelta(days=1), []) if not x["race"]), None)
 target_ctl = None
@@ -274,9 +298,10 @@ if result["new"]:
 
 # ---------- push ----------
 st.subheader("Push to Intervals.icu")
-old_tags = {tag_of(e) for e in events if tag_of(e).startswith("fill-")
+old_tags = {tag_of(e) for e in events if tag_of(e).startswith(FILL_PREFIX)
             and first <= to_date(e["start_date_local"]) <= gap[1]}
-tag = sorted(old_tags)[0] if old_tags else f"fill-{first.isoformat()}"
+running = sorted(t for t in old_tags if first <= today and fill_tag_fits(t, first, today))
+tag = running[0] if running else f"{FILL_PREFIX}{first.isoformat()}"  # a gap under way keeps its tag
 rows = [{"date": d, "workout_id": v[0]} for d, v in sorted(days.items()) if d >= today]
 st.write(f"**{len(rows)} workouts**, tagged `{tag}`."
          + (" This replaces the gap's earlier fill." if old_tags else ""))
@@ -295,7 +320,7 @@ def push_fill():
         save_workbook(wb, path)
         events_out = push.build_events({"plan_tag": tag}, current, rows, today)
         existing = client.list_events(today - push.CLEANUP_WINDOW, last + push.CLEANUP_WINDOW)
-        stale = push.stale_ids(existing, events_out, tag, today)
+        stale = push.stale_fill_ids(existing, events_out, first, gap[1], today)
         push.send(client, events_out, stale)
     except (PlanError, ImportError_) as e:
         st.session_state.fill_message = ("error", str(e))
@@ -303,19 +328,21 @@ def push_fill():
     except Exception as e:
         st.session_state.fill_message = ("error", f"Push failed: {e}")
         return
-    deleted = f" Deleted {len(stale)} old fill workouts." if stale else ""
+    deleted = f" Deleted {len(stale)} old filler workouts." if stale else ""
     st.session_state.fill_message = ("success", f"Pushed {len(events_out)} workouts tagged {tag}.{deleted}")
     st.session_state.pop("fill_confirm", None)
     load_intervals()
 
 
 def write_fill(wb, tag, days):
-    """Replace this tag's rows on the Fill tab (the record of what was pushed for a gap)."""
+    """Replace this tag's rows on the Fill tab (the record of what was pushed for a gap). Rows before
+    the replanned days stay: a gap replanned while under way keeps its history."""
     if FILL_SHEET not in wb.sheetnames:
         wb.create_sheet(FILL_SHEET).append(FILL_HEADERS)
     ws = wb[FILL_SHEET]
+    start = min(days)
     keep = [[c.value for c in row] for row in ws.iter_rows(min_row=2, max_row=last_used_row(ws))
-            if row[0].value and row[0].value != tag]
+            if row[0].value and (row[0].value != tag or to_date(row[1].value) < start)]
     ws.delete_rows(2, max(ws.max_row - 1, 1))
     for r in keep:
         append_row(ws, r)
