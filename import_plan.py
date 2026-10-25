@@ -25,6 +25,7 @@ from pathlib import Path
 
 from openpyxl.styles import Font, PatternFill
 
+from filler import race_distance
 from planlib import (
     DAYS,
     PlanError,
@@ -514,7 +515,7 @@ def save_plan_rows(wb, plan, week_end, sched, source):
     if not found:
         rest_fill, pre_race_fill = choose_fill(wb, [s["workout_id"] for s in sched if s["workout_id"]])
         values = {"plan": plan, "source_week_end": week_end, "notes": source,
-                  "rest_fill": rest_fill, "pre_race_fill": pre_race_fill}
+                  "rest_fill": rest_fill, "pre_race_fill": pre_race_fill, "race_distance": race_distance(plan)}
         append_row(plans, [values.get(h) for h in pcols])
 
 

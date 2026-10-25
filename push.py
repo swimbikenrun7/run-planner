@@ -160,6 +160,20 @@ class Intervals:
         resp.raise_for_status()
         return resp.json()
 
+    def wellness(self, oldest, newest):
+        """Daily fitness (ctl), fatigue (atl) and ramp rate. Read-only."""
+        resp = requests.get(f"{self.base}/wellness", auth=self.auth, timeout=30,
+                            params={"oldest": oldest.isoformat(), "newest": newest.isoformat()})
+        resp.raise_for_status()
+        return resp.json()
+
+    def run_settings(self):
+        """Threshold pace (m/s) and pace zones (% of threshold) for runs. Read-only."""
+        resp = requests.get(self.base, auth=self.auth, timeout=30)
+        resp.raise_for_status()
+        run = next(s for s in resp.json().get("sportSettings", []) if "Run" in (s.get("types") or []))
+        return {"threshold_speed": run["threshold_pace"], "pace_zones": run["pace_zones"]}
+
     def upsert(self, events):
         resp = requests.post(f"{self.base}/events/bulk", params={"upsert": "true"},
                              auth=self.auth, json=events, timeout=30)
