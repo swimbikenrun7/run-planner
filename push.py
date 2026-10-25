@@ -203,12 +203,13 @@ def preview(config, library, layout, client, today=None):
     today = today or date.today()
     events = build_events(config, library, layout, today)
     out = {"events": events, "warnings": layout_warnings(config, library, layout),
-           "existing": None, "found": None, "stale": []}
+           "existing": None, "found": None, "stale": [], "existing_events": []}
     if client is not None:
         tag = str(config["plan_tag"]).strip()
         last = to_date(config["race_date"])
         existing = client.list_events(today - CLEANUP_WINDOW, last + CLEANUP_WINDOW)
         out["existing"] = len(existing)
+        out["existing_events"] = existing
         out["found"] = sum(1 for e in existing if (e.get("external_id") or "").startswith(f"{tag}-"))
         out["stale"] = stale_ids(existing, events, tag, today)
     return out

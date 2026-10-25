@@ -58,7 +58,17 @@ training load. The user's reading of Intervals' help: use absolute below fitness
 - **Ramp:** a fitness increase of about 5-8 per week is a coaching rule of thumb, not an
   injury threshold. The acute:chronic band 0.8-1.3 comes from team sports and is debated.
 
-## Open: the user's training rules for the gap filler
+## The user's training rules (2026-10-24)
 
-Recovery days by race distance; ramp-rate ceiling; recovery-week rhythm; race-day form target;
-what to do after the last plan.
+The proposed defaults were accepted; all of them can be changed on the Fill gaps page.
+- **Recovery after a race:** 5K 3, 10K 4, half 7, marathon 14 easy days.
+- **Ramp limit:** 5 a week. While building, the filler adds two more limits: weekly load at most +10%
+  and the long run at most one step longer. On the first real gap, a ramp of 5 alone allowed a 50%
+  jump in load and a 15-mile long run straight after recovery.
+- **Lighter weeks:** a week at 70% after every 3 build weeks.
+- **Race-day form target:** grey (-10 and up). The user isn't racing all out, so -2 and +1.5 are
+  fine; "fresh" is there for a hard taper (e.g. a BQ attempt).
+- **Between plans and after the last plan:** keep building fitness.
+
+**Workout loads:** `fitness.workout_load` matches Intervals' estimate within 1.3 on all 45 distinct
+planned workouts, so the filler can size workouts before they're on the calendar.

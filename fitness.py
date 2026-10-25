@@ -41,10 +41,20 @@ def step_hours(length_token, pct, threshold_speed):
 
 def workout_load(text, threshold_speed, zones):
     """Estimated load of a workout written in the Library's ' / ' format (or with newlines)."""
+    return sum(hours * (pct / 100) ** 2 * 100 for hours, pct in steps(text, threshold_speed, zones))
+
+
+def workout_hours(text, threshold_speed, zones):
+    """Estimated duration of the steps that have a pace target (untimed jogs aren't counted)."""
+    return sum(hours for hours, _ in steps(text, threshold_speed, zones))
+
+
+def steps(text, threshold_speed, zones):
+    """[(hours, pace %)] for each step with a pace target, repeats expanded."""
     if not text:
-        return 0.0
+        return []
     lines = [ln.strip() for ln in re.split(r" / |\n", str(text)) if ln.strip()]
-    total, repeat = 0.0, 1
+    out, repeat = [], 1
     for line in lines:
         if not line.startswith("-"):
             m = REPEAT.search(line)
@@ -56,8 +66,8 @@ def workout_load(text, threshold_speed, zones):
         pct = float(target.group(1)) if target.group(1) else zone_pace(int(target.group(2)), zones)
         # the length can come before the target ("- 15m 105% Pace") or after ("- Press lap 80% Pace 30m")
         hours = next((h for h in (step_hours(tok, pct, threshold_speed) for tok in line.split()) if h), 0.0)
-        total += repeat * hours * (pct / 100) ** 2 * 100
-    return total
+        out += [(hours, pct)] * repeat
+    return out
 
 
 def project(ctl, atl, loads, first, last):

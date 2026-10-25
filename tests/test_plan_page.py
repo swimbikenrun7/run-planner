@@ -22,7 +22,14 @@ class FakeIntervals:
 
     def list_events(self, oldest, newest):
         # one event of this plan after the race (no workout there now: stale), one of another plan
-        return [{"external_id": f"t-{RACE + timedelta(days=3)}"}, {"external_id": "other-2030-01-01"}]
+        return [{"external_id": f"t-{RACE + timedelta(days=3)}", "start_date_local": f"{RACE + timedelta(days=3)}T00:00:00"},
+                {"external_id": "other-2030-01-01", "start_date_local": "2030-01-01T00:00:00"}]
+
+    def wellness(self, oldest, newest):
+        return [{"id": (date.today() - timedelta(days=k)).isoformat(), "ctl": 40.0, "atl": 45.0} for k in range(4)]
+
+    def run_settings(self):
+        return {"threshold_speed": 3.8779278, "pace_zones": [77.5, 87.7, 94.3, 100.0, 103.4, 111.5, 999.0]}
 
     def upsert(self, events):
         self.upserted = events
@@ -45,8 +52,9 @@ def make_workbook(path, week_roles, allow_pre_long="yes"):
                     ["LONG", "long", "Long", "- Press lap 80% Pace 90m"],
                     ["RACE", "race", "Race", None]],
         "Week": [["day", "role", "workout_id"]] + [[d, week_roles.get(d, "easy"), None] for d in days],
-        "Plans": [["plan", "source_week_end", "notes", "rest_fill", "pre_race_fill", "plan_tag", "race_date", "pushed"],
-                  ["p", "sun", None, "EASY-3MI", "EASY-2MI", None, None, None]],
+        "Plans": [["plan", "source_week_end", "notes", "rest_fill", "pre_race_fill", "plan_tag", "race_date", "pushed",
+                   "race_distance"],
+                  ["p", "sun", None, "EASY-3MI", "EASY-2MI", None, None, None, None]],
         "Schedule": [["plan", "week", "day", "workout_id", "note"]]
                     + [["p", w, d, wid, None] for w, plan_week in ((1, WEEK), (2, RACE_WEEK))
                        for d, wid in zip(days, plan_week)],
@@ -121,6 +129,7 @@ def test_check_and_push_use_intervals_only_after_confirming(workbook, monkeypatc
     assert fake.upserted is None  # the check sends nothing
     assert next(b for b in at.button if b.label == "Push").disabled
     assert any("would be **deleted**" in w.value for w in at.warning)
+    assert any("Projected race-day form" in m.value for m in list(at.info) + list(at.warning))
     at.checkbox(key="confirm").check().run()
     at = click(at, "Push")
     assert "Pushed" in at.success[0].value and fake.upserted and fake.deleted == [f"t-{RACE + timedelta(days=3)}"]
@@ -195,3 +204,20 @@ def test_unsaved_changes_are_named(workbook):
     at.selectbox(key="day0").select("quality").run()
     assert any("Not saved yet: Mon" in c.value for c in at.caption)
     assert any("(Mon)" in i.value for i in at.info)
+
+
+def test_short_taper_warns_against_a_fresh_target(workbook, monkeypatch):
+    wb = openpyxl.load_workbook(workbook)
+    wb["Config"].append(["race_form_target", "fresh"])
+    wb.save(workbook)
+    monkeypatch.setattr(push, "client_from_env", lambda: FakeIntervals())
+    at = click(click(page(), "Lay out"), "Check against Intervals")
+    assert any("taper is short" in w.value for w in at.warning)  # this test plan doesn't taper much
+
+
+def test_race_distance_is_saved_on_the_plans_tab(workbook):
+    at = page()
+    at.selectbox(key="s_race_distance").select("half").run()
+    assert any("race distance" in c.value for c in at.caption)  # named as unsaved
+    at = click(at, "Save settings")
+    assert sheet(workbook, "Plans")[0][8] == "half"

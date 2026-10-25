@@ -3,6 +3,7 @@
 from collections import defaultdict
 from datetime import timedelta
 
+from fitness import project
 from master import tag_of
 from planlib import blank, to_date
 
@@ -44,3 +45,14 @@ def start_state(wellness, day):
     if not prev or prev.get("ctl") is None:
         raise ValueError(f"Intervals has no fitness for {day - timedelta(days=1)}")
     return prev["ctl"], prev["atl"]
+
+
+def race_day_form(ctl, atl, today, race_date, loads, layout_rows, library, load_of):
+    """(form, fitness) going into race day: the other planned load plus this plan's Layout."""
+    loads = defaultdict(float, loads)
+    for r in layout_rows:
+        wid = str(r.get("workout_id") or "").strip()
+        if wid in library and not blank(r.get("date")) and to_date(r["date"]) >= today:
+            loads[to_date(r["date"])] += load_of(library[wid].get("workout_text"))
+    proj = project(ctl, atl, loads, today, race_date)
+    return proj[-1][4], proj[-1][2]

@@ -84,7 +84,8 @@ class Picker:
 
     def __init__(self, library, unit, targets, load_of, rules):
         self.library, self.unit, self.targets, self.load_of = library, unit, targets, load_of
-        self.by_text = {normalize(r.get("workout_text")): w for w, r in library.items()}
+        self.by_text = {(str(r.get("category") or "").strip().lower(), normalize(r.get("workout_text"))): w
+                        for w, r in library.items()}
         self.new = {}  # workout_id -> Library row to add
         self.quality = sorted(((load_of(r.get("workout_text")), w) for w, r in library.items()
                                if str(r.get("category") or "").strip().lower() in rules["quality_categories"]
@@ -94,7 +95,7 @@ class Picker:
 
     def sized(self, kind, size):
         wid, name, text = sized_workout(kind, size, self.unit, self.targets)
-        existing = self.by_text.get(normalize(text))
+        existing = self.by_text.get((kind, normalize(text)))
         if existing:
             return existing, self.load_of(text)
         if wid in self.library and normalize(self.library[wid].get("workout_text")) != normalize(text):

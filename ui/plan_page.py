@@ -1,11 +1,14 @@
 """Plan page: choose a plan and race, lay it out around your week, review it, push it."""
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 import streamlit as st
 
 import push
+from filler import DISTANCES, rules_from_config
+from fitness import form_value, workout_load, zone, zone_floor
+from forecast import event_loads, plan_races, race_day_form, race_load, start_state
 from import_plan import CATEGORIES, ImportError_, set_config, set_plan_fields
 from layout import compute_layout, hard_days_summary, write_result, write_week
 from planlib import (
@@ -59,8 +62,12 @@ def save_settings(new):
         set_config(wb, "plan_tag", new["plan_tag"])
         for key in ("taper_days", "long_run_gap", "allow_pre_long", "long_run_days", "hard_categories"):
             set_config(wb, key, new[key])
-        set_plan_fields(wb, new["plan"], {"rest_fill": new["rest_fill"] or None,
-                                          "pre_race_fill": new["pre_race_fill"] or None})
+        fields = {"rest_fill": new["rest_fill"] or None, "pre_race_fill": new["pre_race_fill"] or None}
+        if "race_distance" in {str(c.value or "").lower() for c in wb["Plans"][1]}:
+            fields["race_distance"] = new["race_distance"] or None
+        elif new["race_distance"]:
+            raise ImportError_("Plans tab has no race_distance column: run setup_workbook.py first")
+        set_plan_fields(wb, new["plan"], fields)
         write_week(wb, new["week"])
     error = saving(change)
     st.session_state.message = ("error", error) if error else (
@@ -102,11 +109,35 @@ def check():
     try:
         if "layout" not in sheets:
             raise PlanError("No Layout tab yet: lay out the plan first")
-        st.session_state.preview = push.preview(config, library, sheets["layout"], push.client_from_env())
+        client = push.client_from_env()
+        p = push.preview(config, library, sheets["layout"], client)
+        if client is not None:
+            p["race_form"] = project_race_day(client, p["existing_events"])
+        st.session_state.preview = p
     except PlanError as e:
         st.session_state.message = ("error", str(e))
     except Exception as e:  # network or API trouble: show it, don't crash the page
         st.session_state.message = ("error", f"Couldn't read Intervals.icu: {e}")
+
+
+def project_race_day(client, existing):
+    """(form, fitness, zone) going into race day, or a message saying why it couldn't be worked out."""
+    try:
+        today = date.today()
+        ctl, atl = start_state(client.wellness(today - timedelta(days=3), today), today)
+        run = client.run_settings()
+        tag = str(config["plan_tag"]).strip()
+        race = to_date(config["race_date"])
+        loads = event_loads(existing, exclude_tag=tag)  # this plan's events are replaced by the Layout
+        paces = {str(r["key"]).strip().upper(): r["target"] for r in sheets.get("paces", [])}
+        for day, dist, other in plan_races(sheets.get("plans", [])):
+            if other != tag and today <= day < race:
+                loads[day] += race_load(dist, paces, run["threshold_speed"])
+        form, fitness = race_day_form(ctl, atl, today, race, loads, sheets["layout"], library,
+                                      lambda t: workout_load(t, run["threshold_speed"], run["pace_zones"]))
+        return form, fitness, zone(form, fitness)
+    except Exception as e:  # the projection only adds information: never let it block the check
+        return f"Couldn't project race-day form: {e}"
 
 
 def send():
@@ -180,8 +211,11 @@ except PlanError as e:
 
 
 def plan_fill(name):
+    """The plan's rest-day fill, day-before-race fill and race distance from the Plans tab."""
     row = plans.get(name, {})
-    return [v if v in easy else "" for v in (str(row.get(k) or "").strip() for k in ("rest_fill", "pre_race_fill"))]
+    rest, pre = (v if v in easy else "" for v in (str(row.get(k) or "").strip() for k in ("rest_fill", "pre_race_fill")))
+    dist = str(row.get("race_distance") or "").strip().lower()
+    return rest, pre, dist if dist in DISTANCES else ""
 
 
 saved = {
@@ -208,12 +242,14 @@ if st.session_state.get("loaded") != stamp:
         "s_hard_categories": saved["hard_categories"].split(", "),
         **{f"day{d}": saved_week[d] if saved_week[d] in options else "" for d in range(7)},
     })
-    st.session_state.s_rest_fill, st.session_state.s_pre_race_fill = plan_fill(saved["plan"])
+    st.session_state.s_rest_fill, st.session_state.s_pre_race_fill, st.session_state.s_race_distance = \
+        plan_fill(saved["plan"])
     st.session_state.loaded = stamp
 
 
 def plan_changed():
-    st.session_state.s_rest_fill, st.session_state.s_pre_race_fill = plan_fill(st.session_state.s_plan)
+    st.session_state.s_rest_fill, st.session_state.s_pre_race_fill, st.session_state.s_race_distance = \
+        plan_fill(st.session_state.s_plan)
 
 
 c1, c2, c3 = st.columns(3)
@@ -232,9 +268,12 @@ new["week"] = week_from_choices(choices)
 if sum(1 for c in choices if c == "long") > 1:
     st.error("Only one long-run day.")
 
-c4, c5 = st.columns(2)
+c4, c5, c6 = st.columns(3)
 new["rest_fill"] = c4.selectbox("Rest days become (blank = keep rest days)", easy, key="s_rest_fill")
 new["pre_race_fill"] = c5.selectbox("Day before the race (shortest run last)", easy, key="s_pre_race_fill")
+new["race_distance"] = c6.selectbox("Race distance", [""] + DISTANCES, key="s_race_distance",
+                                    format_func=lambda d: {"": "(not set)", "half": "half marathon"}.get(d, d.upper()),
+                                    help="Sets the recovery after the race when filling the gap that follows it.")
 
 with st.expander("Layout rules"):
     r1, r2 = st.columns(2)
@@ -251,9 +290,9 @@ with st.expander("Layout rules"):
     new["hard_categories"] = ", ".join(c for c in sorted(CATEGORIES) if c in hard)
 
 saved["week"] = week_from_choices(saved_week)
-saved["rest_fill"], saved["pre_race_fill"] = plan_fill(new["plan"])
+saved["rest_fill"], saved["pre_race_fill"], saved["race_distance"] = plan_fill(new["plan"])
 NAMES = {"plan": "plan", "race_date": "race date", "plan_tag": "plan_tag", "rest_fill": "rest-day fill",
-         "pre_race_fill": "day-before-race fill", "taper_days": "taper days", "long_run_gap": "long-run gap",
+         "pre_race_fill": "day-before-race fill", "race_distance": "race distance", "taper_days": "taper days", "long_run_gap": "long-run gap",
          "allow_pre_long": "pre-long session", "long_run_days": "long-run days", "hard_categories": "hard categories"}
 unsaved = [DAYS[d].title() for d in range(7) if new["week"][d] != saved["week"][d]]
 unsaved += [NAMES[k] for k in NAMES if new[k] != saved[k]]
@@ -333,6 +372,19 @@ if preview:
             st.warning(f"{len(stale)} future events of this plan would be **deleted**: " + ", ".join(stale))
         else:
             st.write("Nothing would be deleted.")
+    race_form = preview.get("race_form")
+    if isinstance(race_form, str):
+        st.caption(race_form)
+    elif race_form:
+        form, fitness, zone_name = race_form
+        target = rules_from_config(config)["race_form_target"]
+        shown = f"{form_value(form, fitness):+.0f}" + ("%" if fitness > 60 else "")
+        text = (f"Projected race-day form: **{shown}** ({zone_name}), fitness {fitness:.0f}. "
+                f"Target: {target} or better (set on the Fill gaps page).")
+        if form_value(form, fitness) < zone_floor(target):
+            st.warning(text + " The taper is short of it: lighten the last week or two, or lower the target.")
+        else:
+            st.info(text)
     for d, msg in preview["warnings"]:
         st.warning(f"{d}: {msg}")
     with st.expander("Workouts to send"):

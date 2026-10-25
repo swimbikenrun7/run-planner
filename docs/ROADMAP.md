@@ -43,7 +43,7 @@ plan styles. It reverses decision 8 (no API billing), so it's the user's call.
 calendar; don't keep a second copy. The app reads events over a range
 (`GET /events?oldest=&newest=`) and shows plans, races and the gaps between them.
 
-**5. Gap filler.** A filler plan is placed backward from the next plan's first day, the way
+**5. Gap filler.** Built 2026-10-24 (`filler.py`, `ui/fill_page.py`); rules in CLAUDE.md. A filler plan is placed backward from the next plan's first day, the way
 layout already places a plan backward from a race date:
 - recovery after the last race
 - base weeks that build toward the next plan's starting load
