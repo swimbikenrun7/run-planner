@@ -125,7 +125,9 @@ def send():
         st.session_state.message = ("error", f"Push failed: {e}")
         return
     deleted = f" Deleted {len(p['stale'])} stale events." if p["stale"] else ""
-    st.session_state.message = ("success", f"Pushed {len(p['events'])} workouts to Intervals.icu.{deleted}")
+    note = saving(lambda wb: push.record_push(wb, cfg))
+    noted = f" (Couldn't note it on the Plans tab: {note})" if note else ""
+    st.session_state.message = ("success", f"Pushed {len(p['events'])} workouts to Intervals.icu.{deleted}{noted}")
     st.session_state.pop("preview", None)
     st.session_state.pop("confirm", None)
 

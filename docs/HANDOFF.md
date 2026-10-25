@@ -69,6 +69,15 @@ On a copy of the master workbook it reproduces the saved Higdon Layout on all 84
 check matches the CLI dry run: 83 workouts, 0 deletions. **Nothing has been pushed for
 `pig-half-2027` yet.** Tests use a fake Intervals client.
 
+## Calendar page (built 2026-10-24, branch `master-calendar`)
+
+It reads Intervals and shows each plan_tag with its first and last workout, race and workout
+count, the gaps (7+ days with nothing planned), and a week grid. It never writes. Race dates come
+from the Plans tab, whose `plan_tag`, `race_date` and `pushed` columns are filled by push.
+`turkey-trot-10k` was pushed before that existed, so its row needs `turkey-trot-10k-2026` /
+2026-11-26 filled in once. With real data the gaps are Nov 27, 2026 to Feb 7, 2027 (between the
+plans) and from May 3, 2027 onward: these are what the gap filler (ROADMAP step 5) will fill.
+
 ## Unverified or open
 
 - **Rest-day fill rule** replaces the user's hand edits to the Layout. On a copy of the master

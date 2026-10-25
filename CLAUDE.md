@@ -50,7 +50,7 @@ and `docs/DECISIONS.md` before changing anything a decision there covers.
 ## Commands
 
 ```bash
-streamlit run app.py                                    # the app (Plan, Import pages), on localhost:8501
+streamlit run app.py                                    # the app (Plan, Import, Calendar pages), on localhost:8501
 python setup_workbook.py plans/plan_builder.xlsx        # idempotent: adds tabs/keys the code needs
 python import_plan.py prompt plans/plan_builder.xlsx    # writes imports/prompt.md for a Claude chat
 python import_plan.py stage  plans/plan_builder.xlsx imports/<plan>.csv
@@ -68,7 +68,8 @@ python -m pytest
 | `planlib.py` | Shared: workbook reading (`read_table`, `last_used_row`), `save_workbook` (lock check), days, Config helpers, `read_week`, `rule_violations` |
 | `import_plan.py` | prompt → stage → apply (`build_prompt`, `parse_csv`, `stage_plan`, `apply_import`, `apply_to_workbook`). Pace keys to targets, workout validation, Library matching, named plans |
 | `layout.py` | Places the selected plan on dates around the Week template; suggests structural options when it doesn't fit (`compute_layout`, `write_result`) |
-| `push.py` | Layout → Intervals.icu events (bulk upsert), deletes stale future events (`preview` reads only, `send` writes) |
+| `push.py` | Layout → Intervals.icu events (bulk upsert), deletes stale future events (`preview` reads only, `send` writes, `record_push` notes it on Plans) |
+| `master.py` | The master calendar: Intervals events by plan_tag, race days, and gaps of 7+ days with nothing planned |
 | `setup_workbook.py` | Migrates an older workbook: Paces, Week, Plans tabs, Schedule `plan` column, Config keys |
 | `prompts/convert_plan.md` | Conversion prompt template (`{{PACES}}`, `{{OFFSET_UNIT}}`, `{{LIBRARY}}` filled by `prompt`) |
 | `tests/` | One test file per module. Pure logic is tested without the workbook or network; `test_app.py` drives pages headlessly with Streamlit's AppTest on a temporary workbook |
@@ -90,7 +91,7 @@ Schedule[Config.plan] + Week --layout--> Layout tab (or Options tab) --push--> I
 | Library | `workout_id`, `category`, `name`, `workout_text`. Grows forever; never overwrite an entry |
 | Paces | `key`, `description`, `target` (see pace table below) |
 | Week | `day`, `role` (`long`/`quality`/`fixed`/`easy`), `workout_id` (for fixed days) |
-| Plans | `plan`, `source_week_end`, `notes`, `rest_fill`, `pre_race_fill` (blank = keep rest days) |
+| Plans | `plan`, `source_week_end`, `notes`, `rest_fill`, `pre_race_fill` (blank = keep rest days), `plan_tag`, `race_date`, `pushed` (written by push: which Intervals tag and race the plan was pushed for) |
 | Schedule | `plan`, `week`, `day`, `workout_id`, `note`: each plan in its own week convention |
 | Layout | generated: one row per date; rows with no date are sessions that couldn't be placed |
 | Import / Import Schedule / Options | transient review tabs, removed when their step completes |

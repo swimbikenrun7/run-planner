@@ -45,8 +45,8 @@ def make_workbook(path, week_roles, allow_pre_long="yes"):
                     ["LONG", "long", "Long", "- Press lap 80% Pace 90m"],
                     ["RACE", "race", "Race", None]],
         "Week": [["day", "role", "workout_id"]] + [[d, week_roles.get(d, "easy"), None] for d in days],
-        "Plans": [["plan", "source_week_end", "notes", "rest_fill", "pre_race_fill"],
-                  ["p", "sun", None, "EASY-3MI", "EASY-2MI"]],
+        "Plans": [["plan", "source_week_end", "notes", "rest_fill", "pre_race_fill", "plan_tag", "race_date", "pushed"],
+                  ["p", "sun", None, "EASY-3MI", "EASY-2MI", None, None, None]],
         "Schedule": [["plan", "week", "day", "workout_id", "note"]]
                     + [["p", w, d, wid, None] for w, plan_week in ((1, WEEK), (2, RACE_WEEK))
                        for d, wid in zip(days, plan_week)],
@@ -124,6 +124,9 @@ def test_check_and_push_use_intervals_only_after_confirming(workbook, monkeypatc
     at.checkbox(key="confirm").check().run()
     at = click(at, "Push")
     assert "Pushed" in at.success[0].value and fake.upserted and fake.deleted == [f"t-{RACE + timedelta(days=3)}"]
+    assert "Couldn't note" not in at.success[0].value
+    tag, race, pushed = sheet(workbook, "Plans")[0][5:8]
+    assert (tag, race.date(), pushed.date()) == ("t", RACE, date.today())  # recorded for the master calendar
 
 
 def test_without_credentials_the_check_works_but_push_is_off(workbook):

@@ -39,7 +39,7 @@ The `main()` functions only print, so the app calls the logic directly. Saves go
 to Claude through the API instead of a chat. Do this only once the prompt is reliable across
 plan styles. It reverses decision 8 (no API billing), so it's the user's call.
 
-**4. Master calendar.** Intervals.icu already holds everything committed, so it is the master
+**4. Master calendar.** Built 2026-10-24 (`master.py`, `ui/calendar_page.py`). Intervals.icu already holds everything committed, so it is the master
 calendar; don't keep a second copy. The app reads events over a range
 (`GET /events?oldest=&newest=`) and shows plans, races and the gaps between them.
 

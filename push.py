@@ -14,7 +14,7 @@ import argparse
 import json
 import os
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import requests
 from dotenv import load_dotenv
@@ -24,8 +24,10 @@ from planlib import (
     blank,
     category_of,
     hard_categories,
+    last_used_row,
     load_workbook_tables,
     rule_violations,
+    save_workbook,
     taper_days,
     to_date,
     yes,
@@ -198,6 +200,24 @@ def preview(config, library, layout, client, today=None):
     return out
 
 
+def record_push(wb, config, today=None):
+    """Note on the plan's Plans row which tag and race it was pushed for, and when."""
+    plans = wb["Plans"]
+    col = {str(c.value or "").strip().lower(): c.column for c in plans[1]}
+    if not {"plan_tag", "race_date", "pushed"} <= set(col):
+        raise PlanError("Plans tab has no plan_tag/race_date/pushed columns: run setup_workbook.py")
+    plan = str(config.get("plan") or "").strip()
+    for r in range(2, last_used_row(plans) + 1):
+        if str(plans.cell(r, 1).value or "").strip() == plan:
+            plans.cell(r, col["plan_tag"]).value = str(config["plan_tag"]).strip()
+            plans.cell(r, col["race_date"]).value = config["race_date"]
+            plans.cell(r, col["race_date"]).number_format = "yyyy-mm-dd"
+            plans.cell(r, col["pushed"]).value = datetime.combine(today or date.today(), datetime.min.time())
+            plans.cell(r, col["pushed"]).number_format = "yyyy-mm-dd"
+            return
+    raise PlanError(f"plan {plan!r} is not on the Plans tab")
+
+
 def send(client, events, stale):
     """Upsert the events and delete the stale ones. This writes to the live calendar."""
     client.upsert(events)
@@ -249,6 +269,12 @@ def main(argv=None):
     print(f"\nPushed {len(events)} events to Intervals.icu.")
     if stale:
         print(f"Deleted {len(stale)} stale events: {', '.join(stale)}")
+    try:
+        wb = load_workbook_tables(args.workbook)[0]
+        record_push(wb, config)
+        save_workbook(wb, args.workbook)
+    except PlanError as e:
+        print(f"Pushed, but couldn't note it on the Plans tab: {e}", file=sys.stderr)
     return 0
 
 

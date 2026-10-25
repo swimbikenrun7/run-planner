@@ -137,6 +137,7 @@ def setup(wb):
         add_config(cfg, "plan", "legacy" if has_rows else None, changes, "the plan to lay out")
 
     add_rest_fill(wb, changes)
+    add_push_record(wb, config, changes)
 
     add_config(cfg, "plan", None, changes, "the plan to lay out")
     add_config(cfg, "taper_days", 2, changes)
@@ -176,6 +177,27 @@ def add_rest_fill(wb, changes):
             changes.append(f"added {m['workout_id']} to Library")
         changes.append(f"Plans {plan}: rest days filled with {rest_fill}, {pre_race_fill} the day before "
                        f"the race (clear both cells to keep rest days)")
+
+
+def add_push_record(wb, config, changes):
+    """Add plan_tag / race_date / pushed to Plans: which Intervals tag and race each plan is for.
+    Config's selected plan gets its plan_tag and race_date; push.py fills the rest as it pushes."""
+    plans = wb["Plans"]
+    headers = [str(c.value or "").strip().lower() for c in plans[1]]
+    if "plan_tag" in headers:
+        return
+    col = len([h for h in headers if h]) + 1
+    for c, name in enumerate(("plan_tag", "race_date", "pushed"), start=col):
+        plans.cell(1, c, name).font = ARIAL_BOLD
+        plans.column_dimensions[plans.cell(1, c).column_letter].width = 16
+    changes.append("added plan_tag, race_date, pushed columns to Plans (filled in when a plan is pushed)")
+    current = str(config.get("plan") or "").strip()
+    for r in range(2, last_used_row(plans) + 1):
+        if current and str(plans.cell(r, 1).value or "").strip() == current:
+            plans.cell(r, col, config.get("plan_tag")).font = ARIAL
+            cell = plans.cell(r, col + 1, config.get("race_date"))
+            cell.font, cell.number_format = ARIAL, "yyyy-mm-dd"
+            changes.append(f"Plans {current}: plan_tag {config.get('plan_tag')}, race_date from Config")
 
 
 def main(argv=None):
