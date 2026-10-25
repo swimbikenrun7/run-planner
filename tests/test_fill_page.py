@@ -108,6 +108,8 @@ def test_push_records_the_fill_and_adds_new_workouts(workbook, monkeypatch):
     wb = openpyxl.load_workbook(workbook)
     fill_rows = list(wb["Fill"].iter_rows(min_row=2, values_only=True))
     assert len(fill_rows) == (B_START - RACE_A).days - 1 and {r[0] for r in fill_rows} == {stale}
+    fitness, fatigue, form, pushed = fill_rows[0][5:9]  # the forecast, kept to compare with what happens
+    assert fitness > 0 and fatigue > 0 and form is not None and pushed.date() == TODAY
     library = {r[0]: r for r in wb["Library"].iter_rows(min_row=2, values_only=True)}
     assert library["EASY-30"][3] == EASY  # existing workouts untouched
     assert all(e["description"] for e in fake.upserted)  # every pushed workout has its text

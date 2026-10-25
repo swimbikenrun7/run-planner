@@ -126,9 +126,6 @@ Nothing has been pushed from this page.
   and short notes, e.g. `10k_Training.xlsx`). They're a different shape from PDF grids.
 - The user's master Library has a block of blank rows (an old append bug, now fixed). Harmless;
   he can delete them in his spreadsheet app.
-- README lost its short "push behaviour" section in the last rewrite; CLAUDE.md covers it, but
-  the user-facing README should say it again. Its setup section still shows Windows PowerShell
-  commands; the project moved to Linux (bash) in October 2026.
 
 ## Backlog (the user sets priorities; don't start these unprompted)
 

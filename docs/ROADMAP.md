@@ -52,7 +52,10 @@ layout already places a plan backward from a race date:
 The training rules are the user's to define before building: recovery length by race distance,
 the base-week mix, and the mileage ramp.
 
-**6. Proposed: refresh.** (Not started; the user's idea, 2026-10-25.) Replanning a gap under way
+**6. Proposed: refresh.** (Not started; the user's idea, 2026-10-25. **Revisit around Jan 3, 2027**,
+after 4-5 weeks of the Nov 27 gap's filler: one full build cycle of 3 build weeks and a lighter week
+after the 4 recovery days, with about 5 weeks of the gap left to adjust. The Fill tab keeps the
+forecast from push time; Intervals' wellness history has the actuals.) Replanning a gap under way
 already starts from today's actual fitness and current threshold. Still missing: a check of how
 actual fitness and form are tracking against what was pushed, and a knob to make the rest of the
 filler harder or easier from that (or from how he feels). Threshold pace isn't forecast: no

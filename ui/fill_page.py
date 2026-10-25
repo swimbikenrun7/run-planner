@@ -26,7 +26,8 @@ from planlib import (
 from ui.common import sidebar, workbook_path
 
 FILL_SHEET = "Fill"
-FILL_HEADERS = ["plan_tag", "date", "workout_id", "load", "note"]
+# the record of each pushed gap, with the forecast at push time (for comparing with what actually happens)
+FILL_HEADERS = ["plan_tag", "date", "workout_id", "load", "note", "fitness", "fatigue", "form", "pushed"]
 QUALITY_CHOICES = ["tempo", "threshold", "interval", "fartlek", "hills", "steady"]
 ZONE_COLOURS = {"transition": "#fff2cc", "fresh": "#cfe2f3", "grey": "#eeeeee", "optimal": "#d9ead3",
                 "high risk": "#f4cccc"}
@@ -316,7 +317,7 @@ def push_fill():
             if r["workout_id"] not in current:  # never overwrite
                 append_row(lib_ws, [r["workout_id"], r["category"], r["name"], r["workout_text"]])
                 current[r["workout_id"]] = r
-        write_fill(wb, tag, days)
+        write_fill(wb, tag, days, proj)
         save_workbook(wb, path)
         events_out = push.build_events({"plan_tag": tag}, current, rows, today)
         existing = client.list_events(today - push.CLEANUP_WINDOW, last + push.CLEANUP_WINDOW)
@@ -334,20 +335,26 @@ def push_fill():
     load_intervals()
 
 
-def write_fill(wb, tag, days):
+def write_fill(wb, tag, days, projection):
     """Replace this tag's rows on the Fill tab (the record of what was pushed for a gap). Rows before
     the replanned days stay: a gap replanned while under way keeps its history."""
     if FILL_SHEET not in wb.sheetnames:
         wb.create_sheet(FILL_SHEET).append(FILL_HEADERS)
     ws = wb[FILL_SHEET]
+    for i, h in enumerate(FILL_HEADERS, start=1):  # older Fill tabs lack the forecast columns
+        ws.cell(1, i).value = h
     start = min(days)
     keep = [[c.value for c in row] for row in ws.iter_rows(min_row=2, max_row=last_used_row(ws))
             if row[0].value and (row[0].value != tag or to_date(row[1].value) < start)]
     ws.delete_rows(2, max(ws.max_row - 1, 1))
     for r in keep:
         append_row(ws, r)
+    forecast = {p[0]: p[2:] for p in projection}
+    pushed = datetime.combine(today, datetime.min.time())
     for d, (wid, load, note) in sorted(days.items()):
-        append_row(ws, [tag, datetime.combine(d, datetime.min.time()), wid, round(load), note])
+        fitness, fatigue, form = forecast[d]
+        append_row(ws, [tag, datetime.combine(d, datetime.min.time()), wid, round(load), note,
+                        round(fitness, 1), round(fatigue, 1), round(form, 1), pushed])
 
 
 confirm = st.checkbox(f"Send {len(rows)} workouts to my Intervals calendar and watch", key="fill_confirm")
