@@ -98,3 +98,27 @@ def zone(form, fitness):
 def zone_floor(name):
     """Lowest form value that still counts as the named zone (e.g. 'grey' -> -10)."""
     return dict(ZONES)[name]
+
+
+def race_speed(text, meters):
+    """Speed in m/s from a race prediction: a finish time ('41:45', '1:32:10') or a pace ('6:43/mi')."""
+    m = re.fullmatch(r"\s*(\d+):(\d{2})\s*/\s*(mi|km)\s*", str(text or ""))
+    if m:
+        return METERS[m[3]] / (int(m[1]) * 60 + int(m[2]))
+    m = re.fullmatch(r"\s*(?:(\d+):)?(\d{1,2}):(\d{2})\s*", str(text or ""))
+    if m:
+        seconds = int(m[1] or 0) * 3600 + int(m[2]) * 60 + int(m[3])
+        if seconds:
+            return meters / seconds
+    raise ValueError(f"{text!r} should be a finish time like 41:45 or a pace like 6:43/mi")
+
+
+def threshold_from_race(speed, race_pct, unit):
+    """Threshold pace for a race run at race_pct % of threshold speed (Paces tab: 10K is 103%),
+    rounded to the second. Returns (threshold speed in m/s, pace text like '6:55/mi')."""
+    seconds = round(METERS[unit] / (speed / (race_pct / 100)))
+    return METERS[unit] / seconds, pace_text(seconds, unit)
+
+
+def pace_text(seconds, unit):
+    return f"{seconds // 60}:{seconds % 60:02d}/{unit}"

@@ -181,6 +181,9 @@ new. ID collisions are renamed with `-2`, never overwritten.
   `start_date_local`, `name`, `description` (workout text), `external_id = "<plan_tag>-<date>"`.
   Upsert matches on external_id, so re-pushing updates in place.
 - `GET /events?oldest=&newest=` returns `external_id` (verified by the user).
+- `PUT /sport-settings/Run?recalcHrZones=false` with `{"threshold_pace": m/s}`: the Plan page's
+  threshold update (from a 10K prediction ÷ the Paces tab's 10K %), only after the user confirms;
+  it re-reads to check the change took. Not yet run against the live account.
 - `PUT /events/bulk-delete` with `[{"external_id": ...}]`. Push deletes only *future* events:
   this plan_tag's whose dates no longer have a workout, filler in the plan's dates, and an
   overlapping plan's workouts when the user chose to replace it (`push.overlaps`, `push.resolve`).

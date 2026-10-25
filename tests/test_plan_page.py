@@ -19,6 +19,7 @@ RACE_WEEK = ["EASY-3MI", "INT", "EASY-2MI", None, None, None, "RACE"]
 class FakeIntervals:
     def __init__(self):
         self.upserted = self.deleted = None
+        self.threshold = 3.8779278  # 6:55/mi
 
     def list_events(self, oldest, newest):
         # one event of this plan after the race (no workout there now: stale), one of another plan
@@ -29,7 +30,10 @@ class FakeIntervals:
         return [{"id": (date.today() - timedelta(days=k)).isoformat(), "ctl": 40.0, "atl": 45.0} for k in range(4)]
 
     def run_settings(self):
-        return {"threshold_speed": 3.8779278, "pace_zones": [77.5, 87.7, 94.3, 100.0, 103.4, 111.5, 999.0]}
+        return {"threshold_speed": self.threshold, "pace_zones": [77.5, 87.7, 94.3, 100.0, 103.4, 111.5, 999.0]}
+
+    def set_threshold(self, speed):
+        self.threshold = speed
 
     def upsert(self, events):
         self.upserted = events
@@ -43,7 +47,8 @@ def make_workbook(path, week_roles, allow_pre_long="yes"):
     wb.active.title = "Config"
     days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     tables = {
-        "Config": [["key", "value"], ["plan", "p"], ["race_date", RACE], ["plan_tag", "t"],
+        "Paces": [["key", "description", "target"], ["10K", "", "103% Pace"]],
+        "Config": [["key", "value"], ["threshold_pace", "6:55/mi"], ["plan", "p"], ["race_date", RACE], ["plan_tag", "t"],
                    ["allow_pre_long", allow_pre_long]],
         "Library": [["workout_id", "category", "name", "workout_text"],
                     ["EASY-3MI", "easy", "Easy 3mi", "- Press lap 80% Pace 3mi"],
@@ -114,7 +119,7 @@ def test_options_appear_as_cards_and_choosing_one_updates_the_week(workbook, mon
 
 def test_save_settings_writes_config_and_plans(workbook):
     at = page()
-    at.text_input[0].input("t2").run()
+    at.text_input(key="s_plan_tag").input("t2").run()
     labelled(at.selectbox, "Rest days become").select("").run()  # keep rest days
     at = click(at, "Save settings")
     config = dict(r[:2] for r in sheet(workbook, "Config"))
@@ -164,7 +169,7 @@ def test_week_dropdowns_and_rules_are_saved_and_used_by_layout(workbook):
 
 def test_unsaved_changes_explain_why_the_check_is_locked(workbook):
     at = page()
-    at.text_input[0].input("t2").run()
+    at.text_input(key="s_plan_tag").input("t2").run()
     assert next(b for b in at.button if b.label == "Check against Intervals").disabled
     assert any("changes that aren't saved" in i.value for i in at.info)
 
@@ -260,3 +265,25 @@ def test_replacing_an_overlapping_plan_deletes_its_workouts_in_this_plans_dates(
     at = click(at, "Push")
     assert sorted(x for x in fake.deleted if x.startswith("old-")) == [
         f"old-{RACE - timedelta(days=k)}" for k in (12, 11)]  # its day before this plan stays
+
+
+def test_threshold_from_a_10k_prediction_updates_intervals_and_config(workbook, monkeypatch):
+    fake = FakeIntervals()
+    monkeypatch.setattr(push, "client_from_env", lambda: fake)
+    at = page()
+    at.text_input(key="th_10k").input("40:30").run()
+    at = click(at, "Calculate threshold pace")
+    assert any("**6:43/mi**" in m.value and "Intervals has 6:55/mi" in m.value for m in at.markdown)
+    assert fake.threshold == 3.8779278  # calculating only reads
+    assert next(b for b in at.button if b.label.startswith("Update Intervals")).disabled
+    at.checkbox(key="th_confirm").check().run()
+    at = click(at, "Update Intervals and the workbook")
+    assert "6:43/mi on Intervals" in at.success[0].value and abs(fake.threshold - 1609.344 / 403) < 1e-9
+    assert dict(r[:2] for r in sheet(workbook, "Config"))["threshold_pace"] == "6:43/mi"
+
+
+def test_a_bad_prediction_says_what_it_wants(workbook):
+    at = page()
+    at.text_input(key="th_10k").input("soon").run()
+    at = click(at, "Calculate threshold pace")
+    assert "finish time like 41:45" in at.error[0].value

@@ -40,3 +40,15 @@ def test_zones_absolute_below_fitness_60_and_percent_above():
 
 def test_zone_floor():
     assert zone_floor("grey") == -10 and zone_floor("fresh") == 5
+
+
+def test_threshold_from_a_10k_prediction():
+    from fitness import race_speed, threshold_from_race
+    by_time = race_speed("41:42", 10000)
+    by_pace = race_speed("6:43/mi", 10000)
+    assert abs(by_time - by_pace) < 0.01  # 41:42 for 10K is about 6:43/mi
+    speed, text = threshold_from_race(by_pace, 103, "mi")
+    assert text == "6:55/mi" and abs(speed - 1609.344 / 415) < 1e-9  # the user's current threshold
+    assert race_speed("1:32:10", 21097.5) > 0
+    with pytest.raises(ValueError):
+        race_speed("fast", 10000)
