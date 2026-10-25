@@ -517,6 +517,56 @@ def save_week(wb, week, allow):
         cfg.cell(last_used_row(cfg), 2).value = value
 
 
+def compute_layout(config, library, sheets, today, option=None):
+    """Lay out Config's plan around the Week tab. Raises PlanError.
+
+    Returns {"name", "missing", "picks"} when hard sessions don't fit and no option was chosen;
+    otherwise {"name", "rows", "week_change"}, where week_change is (week, allow) when the chosen
+    option changes the Week tab.
+    """
+    if blank(config.get("race_date")):
+        raise PlanError("Config is missing race_date")
+    race_date = to_date(config["race_date"])
+    name, week_end, rows = selected_plan(config, sheets)
+    rest_fill, pre_race_fill = plan_fill(sheets, name, library)
+    week = read_week(sheets.get("week", []), library)
+    items, last_week = plan_items(race_date, week_end, library, rows)
+
+    ctx = Context(race_date, hard_categories(config), taper_days(config), long_run_gap(config),
+                  library, today, items, last_week)
+    allow = yes(config.get("allow_pre_long"))
+    placed, unplaced = place(ctx, week, allow)
+    missing = future_hard(ctx, unplaced)
+    week_change = None
+
+    if missing or option is not None:
+        picks = suggest(ctx, week, allow, long_run_days(config, week))
+        if option is None:
+            return {"name": name, "missing": missing, "picks": picks}
+        if not 0 <= option < len(picks):
+            raise PlanError(f"option must be 0 to {len(picks) - 1}")
+        chosen = picks[option]
+        week, allow = chosen["week"], chosen["allow"]
+        if chosen["changes"]:
+            week_change = (week, allow)
+        placed, unplaced = place(ctx, week, allow)
+
+    fill_rest_days(ctx, placed, rest_fill, pre_race_fill)
+    return {"name": name, "rows": layout_rows(ctx, placed, unplaced, allow), "week_change": week_change}
+
+
+def write_result(wb, result):
+    """Write compute_layout's result: the Options tab, or the Layout tab (and Week, if it changed)."""
+    if "picks" in result:
+        write_options(wb, result["picks"])
+        return
+    if result["week_change"]:
+        save_week(wb, *result["week_change"])
+    write_layout(wb, result["rows"])
+    if OPTIONS_SHEET in wb.sheetnames:
+        del wb[OPTIONS_SHEET]
+
+
 def main(argv=None, today=None):
     parser = argparse.ArgumentParser(description="Lay out the selected plan around your week.")
     parser.add_argument("workbook")
@@ -526,57 +576,29 @@ def main(argv=None, today=None):
 
     try:
         wb, config, library, sheets = load_workbook_tables(args.workbook)
-        if blank(config.get("race_date")):
-            raise PlanError("Config is missing race_date")
-        race_date = to_date(config["race_date"])
-        name, week_end, rows = selected_plan(config, sheets)
-        rest_fill, pre_race_fill = plan_fill(sheets, name, library)
-        week = read_week(sheets.get("week", []), library)
-        items, last_week = plan_items(race_date, week_end, library, rows)
+        result = compute_layout(config, library, sheets, today, args.option)
     except PlanError as e:
         print(f"Plan has problems:\n{e}", file=sys.stderr)
         return 1
-
-    ctx = Context(race_date, hard_categories(config), taper_days(config), long_run_gap(config),
-                  library, today, items, last_week)
-    allow = yes(config.get("allow_pre_long"))
-    placed, unplaced = place(ctx, week, allow)
-    missing = future_hard(ctx, unplaced)
-
-    if missing or args.option is not None:
-        picks = suggest(ctx, week, allow, long_run_days(config, week))
-        if args.option is None:
-            write_options(wb, picks)
-            if not save(wb, args.workbook):
-                return 1
-            print(f"{name}: {len(missing)} hard sessions don't fit your week. Options "
-                  f"(also on the Options tab):\n")
-            for n, p in enumerate(picks):
-                extra = f" (+{p['off']} sessions on non-quality days)" if p["off"] else ""
-                print(f"  [{n}] {len(p['missing'])} not placed -> {hard_days_summary(p['week'], p['allow'])}{extra}")
-                for c in p["changes"] or ["(keep your week as it is)"]:
-                    print(f"        {c}")
-                if p["missing"] and n == 0:
-                    print("        not placed: " + ", ".join(f"wk{i['week']} {i['wid']}" for i, _ in p["missing"]))
-            print(f"\nPick one: python layout.py {args.workbook} --option N")
-            return 2
-        if not 0 <= args.option < len(picks):
-            print(f"--option must be 0 to {len(picks) - 1}", file=sys.stderr)
-            return 1
-        chosen = picks[args.option]
-        week, allow = chosen["week"], chosen["allow"]
-        if chosen["changes"]:
-            save_week(wb, week, allow)
-        placed, unplaced = place(ctx, week, allow)
-
-    fill_rest_days(ctx, placed, rest_fill, pre_race_fill)
-    rows = layout_rows(ctx, placed, unplaced, allow)
-    write_layout(wb, rows)
-    if OPTIONS_SHEET in wb.sheetnames:
-        del wb[OPTIONS_SHEET]
+    write_result(wb, result)
     if not save(wb, args.workbook):
         return 1
 
+    name = result["name"]
+    if "picks" in result:
+        print(f"{name}: {len(result['missing'])} hard sessions don't fit your week. Options "
+              f"(also on the Options tab):\n")
+        for n, p in enumerate(result["picks"]):
+            extra = f" (+{p['off']} sessions on non-quality days)" if p["off"] else ""
+            print(f"  [{n}] {len(p['missing'])} not placed -> {hard_days_summary(p['week'], p['allow'])}{extra}")
+            for c in p["changes"] or ["(keep your week as it is)"]:
+                print(f"        {c}")
+            if p["missing"] and n == 0:
+                print("        not placed: " + ", ".join(f"wk{i['week']} {i['wid']}" for i, _ in p["missing"]))
+        print(f"\nPick one: python layout.py {args.workbook} --option N")
+        return 2
+
+    rows = result["rows"]
     dated = [r for r in rows if r["date"]]
     print(f"{name}: Layout written, {dated[0]['date']} to {dated[-1]['date']} "
           f"({sum(1 for r in dated if r['date'] < today)} days before today, not pushed).")
