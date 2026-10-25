@@ -179,44 +179,63 @@ def client_from_env():
     return Intervals(athlete_id, api_key)
 
 
+def preview(config, library, layout, client, today=None):
+    """Everything a push would do, without sending anything. Raises PlanError.
+
+    client may be None (no .env): then Intervals isn't read and stale events can't be found.
+    """
+    today = today or date.today()
+    events = build_events(config, library, layout, today)
+    out = {"events": events, "warnings": layout_warnings(config, library, layout),
+           "existing": None, "found": None, "stale": []}
+    if client is not None:
+        tag = str(config["plan_tag"]).strip()
+        last = to_date(config["race_date"])
+        existing = client.list_events(today - CLEANUP_WINDOW, last + CLEANUP_WINDOW)
+        out["existing"] = len(existing)
+        out["found"] = sum(1 for e in existing if (e.get("external_id") or "").startswith(f"{tag}-"))
+        out["stale"] = stale_ids(existing, events, tag, today)
+    return out
+
+
+def send(client, events, stale):
+    """Upsert the events and delete the stale ones. This writes to the live calendar."""
+    client.upsert(events)
+    if stale:
+        client.delete(stale)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Push the Layout tab to Intervals.icu.")
     parser.add_argument("workbook")
     parser.add_argument("--dry-run", action="store_true", help="print events, send nothing")
     args = parser.parse_args(argv)
 
+    client = client_from_env()
+    if client is None and not args.dry_run:
+        print("Set INTERVALS_ATHLETE_ID and INTERVALS_API_KEY in .env", file=sys.stderr)
+        return 1
     try:
         _, config, library, sheets = load_workbook_tables(args.workbook)
         if "layout" not in sheets:
             raise PlanError("No Layout tab: run layout.py first")
-        layout = sheets["layout"]
-        events = build_events(config, library, layout)
+        p = preview(config, library, sheets["layout"], client)
     except PlanError as e:
         print(f"Plan has problems:\n{e}", file=sys.stderr)
         return 1
+    events, stale = p["events"], p["stale"]
 
     for e in events:
         d = to_date(e["start_date_local"])
         print(f"{d}  {d.strftime('%a')}  {e['name']}")
-    for d, msg in layout_warnings(config, library, layout):
+    for d, msg in p["warnings"]:
         print(f"  WARNING {d}: {msg}")
 
-    client = client_from_env()
     if client is None:
-        if args.dry_run:
-            print(f"\n{len(events)} events (dry run). No .env credentials, so stale-event check skipped.")
-            return 0
-        print("Set INTERVALS_ATHLETE_ID and INTERVALS_API_KEY in .env", file=sys.stderr)
-        return 1
-
-    first = date.today()
-    last = to_date(config["race_date"])
-    existing = client.list_events(first - CLEANUP_WINDOW, last + CLEANUP_WINDOW)
-    stale = stale_ids(existing, events, str(config["plan_tag"]).strip())
-
+        print(f"\n{len(events)} events (dry run). No .env credentials, so stale-event check skipped.")
+        return 0
     tag = str(config["plan_tag"]).strip()
-    found = sum(1 for e in existing if (e.get("external_id") or "").startswith(f"{tag}-"))
-    print(f"\nIntervals has {len(existing)} events in the window; {found} belong to plan_tag {tag!r}.")
+    print(f"\nIntervals has {p['existing']} events in the window; {p['found']} belong to plan_tag {tag!r}.")
 
     if args.dry_run:
         print(f"{len(events)} events would be pushed; {len(stale)} stale events would be deleted:")
@@ -226,10 +245,9 @@ def main(argv=None):
         print(json.dumps(events[0], indent=2))
         return 0
 
-    client.upsert(events)
+    send(client, events, stale)
     print(f"\nPushed {len(events)} events to Intervals.icu.")
     if stale:
-        client.delete(stale)
         print(f"Deleted {len(stale)} stale events: {', '.join(stale)}")
     return 0
 

@@ -3,7 +3,7 @@ from datetime import date
 import pytest
 
 from planlib import PlanError
-from push import build_events, layout_warnings, stale_ids, to_intervals_text
+from push import build_events, layout_warnings, preview, send, stale_ids, to_intervals_text
 
 RACE = date(2026, 11, 26)  # a Thursday
 CONFIG = {"race_date": RACE, "plan_tag": "t"}
@@ -75,3 +75,35 @@ def test_hand_edits_to_layout_are_checked():
     ]
     warnings = layout_warnings(CONFIG, LIBRARY, layout)
     assert any("back-to-back" in msg for _, msg in warnings)
+
+
+class FakeIntervals:
+    """Stands in for the Intervals.icu client: records calls, never touches the network."""
+
+    def __init__(self, existing):
+        self.existing, self.upserted, self.deleted = existing, None, None
+
+    def list_events(self, oldest, newest):
+        return self.existing
+
+    def upsert(self, events):
+        self.upserted = events
+
+    def delete(self, external_ids):
+        self.deleted = external_ids
+
+
+def test_preview_reads_intervals_but_sends_nothing():
+    client = FakeIntervals([{"external_id": "t-2026-11-21"}, {"external_id": "other-2026-11-21"}])
+    p = preview(CONFIG, LIBRARY, [{"date": date(2026, 11, 25), "workout_id": "EASY"}], client,
+                today=date(2026, 11, 10))
+    assert (len(p["events"]), p["existing"], p["found"], p["stale"]) == (1, 2, 1, ["t-2026-11-21"])
+    assert client.upserted is None and client.deleted is None
+    send(client, p["events"], p["stale"])
+    assert len(client.upserted) == 1 and client.deleted == ["t-2026-11-21"]
+
+
+def test_preview_without_credentials_skips_the_stale_check():
+    p = preview(CONFIG, LIBRARY, [{"date": date(2026, 11, 25), "workout_id": "EASY"}], None,
+                today=date(2026, 11, 10))
+    assert p["existing"] is None and p["stale"] == []
