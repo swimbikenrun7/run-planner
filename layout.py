@@ -235,7 +235,8 @@ def place(ctx, week, allow_pre_long, off_template=None):
     # easy runs keep their own date when free, otherwise the nearest open day in their own week
     # (earlier first, like hard sessions); the plan's rest days give way to them
     displaced = []
-    for item in (i for i in ctx.items if i["wid"] and i["category"] not in ctx.hard):
+    for item in (i for i in ctx.items if i["wid"] and i["category"] not in ctx.hard
+                 and i["category"] not in ("long", "tuneup", "race")):  # placed above, hard or not
         if item["naive"] not in placed and ctx.plan_start <= item["naive"] <= ctx.race_date:
             placed[item["naive"]] = item
         else:

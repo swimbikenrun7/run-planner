@@ -193,3 +193,11 @@ def test_longer_plan_run_the_day_before_the_race_moves_earlier():
     fill_rest_days(ctx, placed, "E3", "E2")
     assert placed[RACE - ONE_DAY]["wid"] == "E2"
     assert [placed[RACE - timedelta(days=k)]["wid"] for k in range(6, 1, -1)] == ["E3"] * 5
+
+
+def test_tuneup_is_placed_once_even_when_not_counted_as_hard():
+    items, last = plan_items(RACE, 6, LIBRARY, rows_for([["EASY", "INT", "EASY", "TEMPO", None, None, "TUNE"],
+                                                          RACE_WEEK]))
+    ctx = Context(RACE, HARD - {"tuneup"}, 2, 5, LIBRARY, TODAY, items, last)
+    placed, _ = place(ctx, week_tpl(sat="long", tue="quality", thu="quality"), False)
+    assert [d for d, i in placed.items() if i["wid"] == "TUNE"] == [RACE - timedelta(days=8)]  # Sat only
