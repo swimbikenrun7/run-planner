@@ -256,6 +256,12 @@ class Intervals:
         run = next(s for s in resp.json().get("sportSettings", []) if "Run" in (s.get("types") or []))
         return {"threshold_speed": run["threshold_pace"], "pace_zones": run["pace_zones"]}
 
+    def set_threshold(self, speed):
+        """Set the Run threshold pace (m/s). This changes the athlete's Intervals settings."""
+        resp = requests.put(f"{self.base}/sport-settings/Run", params={"recalcHrZones": "false"},
+                            auth=self.auth, json={"threshold_pace": speed}, timeout=30)
+        resp.raise_for_status()
+
     def upsert(self, events):
         resp = requests.post(f"{self.base}/events/bulk", params={"upsert": "true"},
                              auth=self.auth, json=events, timeout=30)

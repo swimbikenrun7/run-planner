@@ -109,7 +109,17 @@ Nothing has been pushed from this page.
 - On the user's calendar today: no overlaps (Higdon dry run: 83 to send, 0 to delete), gaps
   "Nov 27 to Feb 7: not filled" and "May 3 onward: fills from Feb 2".
 
+## Threshold pace (built 2026-10-25, branch `threshold`)
+
+Plan page, "Threshold pace": enter Garmin's 10K prediction (finish time or pace), Calculate shows
+threshold = 10K speed ÷ 103% (the Paces tab's 10K) and what Intervals has now (read-only). Behind a
+checkbox, a button sets it on Intervals and in Config `threshold_pace`. A 41:42 prediction gives
+6:55/mi, matching his current setting.
+
 ## Unverified or open
+
+- **The threshold update on Intervals hasn't been run for real.** It uses the documented
+  `PUT /sport-settings/Run` and re-reads afterwards, so if Intervals ignores it the page says so.
 
 - **Rest-day fill rule** replaces the user's hand edits to the Layout. On a copy of the master
   workbook, rerunning layout reproduces his hand-edited Higdon Layout on all 84 days (after

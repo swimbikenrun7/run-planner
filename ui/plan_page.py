@@ -7,9 +7,9 @@ import streamlit as st
 
 import push
 from filler import DISTANCES, rules_from_config
-from fitness import form_value, workout_load, zone, zone_floor
+from fitness import METERS, form_value, pace_text, race_speed, threshold_from_race, workout_load, zone, zone_floor
 from forecast import event_loads, plan_races, race_day_form, race_load, start_state
-from import_plan import CATEGORIES, ImportError_, set_config, set_plan_fields
+from import_plan import CATEGORIES, ImportError_, parse_pace, set_config, set_plan_fields
 from layout import compute_layout, hard_days_summary, write_result, write_week
 from planlib import (
     DAYS,
@@ -204,6 +204,66 @@ st.title("Plan")
 if "message" in st.session_state:
     kind, text = st.session_state.pop("message")
     (st.success if kind == "success" else st.error)(text)
+
+
+# ---------- threshold pace ----------
+def calculate_threshold():
+    """Threshold pace from the 10K prediction, and what Intervals has now (read-only)."""
+    st.session_state.pop("threshold", None)
+    try:
+        unit = parse_pace(config["threshold_pace"])[1] if not blank(config.get("threshold_pace")) else "mi"
+        pct = float(str(paces["10K"]).split("%")[0])
+        speed, text = threshold_from_race(race_speed(st.session_state.th_10k, METERS["km"] * 10), pct, unit)
+    except (ValueError, KeyError, PlanError) as e:
+        st.session_state.message = ("error", f"Can't work out threshold pace: {e}")
+        return
+    now = None
+    client = push.client_from_env()
+    if client is not None:
+        try:
+            now = pace_text(round(METERS[unit] / client.run_settings()["threshold_speed"]), unit)
+        except Exception as e:  # only for comparison: don't block the calculation
+            now = f"couldn't read ({e})"
+    st.session_state.threshold = {"speed": speed, "text": text, "pct": pct, "intervals": now,
+                                  "client": client is not None}
+
+
+def save_threshold():
+    """Set threshold pace on Intervals (Run settings), check it took, and in Config. Writes to both."""
+    th = st.session_state.threshold
+    try:
+        client = push.client_from_env()
+        client.set_threshold(th["speed"])
+        got = client.run_settings()["threshold_speed"]
+        if abs(got - th["speed"]) > 0.001:
+            raise PlanError(f"Intervals still has {got:.3f} m/s after the update")
+    except Exception as e:
+        st.session_state.message = ("error", f"Couldn't update Intervals: {e}")
+        return
+    error = saving(lambda wb: set_config(wb, "threshold_pace", th["text"]))
+    st.session_state.message = ("error", f"Intervals updated to {th['text']}, but the workbook wasn't: {error}") \
+        if error else ("success", f"Threshold pace is now {th['text']} on Intervals and in the workbook.")
+    st.session_state.pop("threshold", None)
+    st.session_state.pop("th_confirm", None)
+
+
+paces = {str(r["key"]).strip().upper(): r["target"] for r in sheets.get("paces", [])}
+with st.expander(f"Threshold pace (now {config.get('threshold_pace') or 'not set'} in the workbook)"):
+    st.caption(f"Threshold pace is about the pace you could race for an hour. Your Paces tab puts 10K race "
+               f"pace at {paces.get('10K', '103% Pace')} of threshold speed (Daniels), so threshold is 10K pace "
+               "about 3% slower. Every pace target is a % of it, so updating it on Intervals moves all your "
+               "targets and load estimates with it.")
+    st.text_input("Garmin's 10K prediction: finish time (41:45) or pace (6:43/mi)", key="th_10k")
+    st.button("Calculate threshold pace", on_click=calculate_threshold, disabled=not st.session_state.get("th_10k"))
+    th = st.session_state.get("threshold")
+    if th:
+        st.markdown(f"Threshold pace: **{th['text']}** (10K speed ÷ {th['pct']:g}%)."
+                    + (f" Intervals has {th['intervals']} now." if th["intervals"] else ""))
+        if th["client"]:
+            ok = st.checkbox(f"Set my Intervals threshold pace for runs to {th['text']}", key="th_confirm")
+            st.button("Update Intervals and the workbook", disabled=not ok, on_click=save_threshold)
+        else:
+            st.caption("No .env credentials: set it by hand in Intervals (Settings, Run, Threshold pace).")
 
 # ---------- 1. plan, race and your week ----------
 st.subheader("1. Plan, race and your week")
