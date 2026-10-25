@@ -57,11 +57,9 @@ hasn't seen it running yet. The user hasn't set up Tailscale yet either.
 
 ## Unverified or open
 
-- **Rest-day fill rule (branch `rest-fill`)** replaces the user's hand edits to the Layout. On
-  a copy of the master workbook, rerunning layout with the rule matches his hand-edited Layout
-  on 83 of 84 days. The exception is race-week Friday Apr 30: the rule gives 2mi (the plan's own
-  displaced Wednesday 2mi lands there), where his edit had 3mi. Ask whether that matters.
-  `setup_workbook.py` detected `turkey-trot-10k` as a time-based plan (`EASY-30`/`EASY-20`).
+- **Rest-day fill rule** replaces the user's hand edits to the Layout. On a copy of the master
+  workbook, rerunning layout reproduces his hand-edited Higdon Layout on all 84 days (after
+  `setup_workbook.py` adds the Plans columns). His master workbook still needs that setup run.
 - **Hill steps with no pace target** (`- Uphill hard 90s`): not yet seen on the watch. Push one
   hill workout and have the user check it before relying on the format.
 - **The user's older Library entries use pre-convention paces** (tempo 95%, threshold 105%,

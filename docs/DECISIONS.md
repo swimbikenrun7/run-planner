@@ -42,4 +42,5 @@ Anything marked (user) is the user's call; change it only with him.
 18. **Rest days become easy runs** (user). He runs every day: the plan's rest days get `rest_fill`
     (3mi or 30m, matching how the plan writes easy runs) and the day before the race a shorter
     `pre_race_fill` (2mi or 20m). It's a rule per plan on the Plans tab rather than hand overrides,
-    so rerunning layout keeps it.
+    so rerunning layout keeps it. In race week the shortest run goes the day before the race
+    ("shortest run last"), so a plan's own 2mi race-week run becomes the shakeout.

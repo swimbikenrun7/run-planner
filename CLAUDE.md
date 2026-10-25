@@ -131,7 +131,10 @@ the best change of each kind: keep the long day / keep fixed days / move the lon
 user picks with `--option N`, which rewrites the Week tab.
 
 **Rest-day fill** (user): the user doesn't take rest days. After placement, every rest day left
-becomes the plan's `rest_fill` and the day before the race its `pre_race_fill`. These are
+becomes the plan's `rest_fill`. In race week the shortest run goes on the day before the race:
+the plan's own easy run if it's no longer than `pre_race_fill` (the run it displaces moves to an
+open day earlier in the week), otherwise `pre_race_fill` itself. A longer plan run on that day
+moves to an earlier open day. The fill workouts are
 `EASY-3MI`/`EASY-2MI` for plans that write easy runs in distance and `EASY-30`/`EASY-20` for
 time, detected when a plan is first imported and editable on the Plans tab. Re-importing keeps
 his values.

@@ -45,6 +45,7 @@ from planlib import (
     load_workbook_tables,
     long_run_gap,
     read_week,
+    run_length,
     save_workbook,
     taper_days,
     to_date,
@@ -254,16 +255,39 @@ def place(ctx, week, allow_pre_long, off_template=None):
 
 
 def fill_rest_days(ctx, placed, rest_fill, pre_race_fill):
-    """Rest days left after placement become easy runs; the day before the race gets pre_race_fill."""
+    """Rest days left after placement become rest_fill easy runs. In race week the shortest run
+    goes on the day before the race (user): the plan's own easy run if it's no longer than
+    pre_race_fill, otherwise pre_race_fill itself."""
+    pre = ctx.race_date - ONE
+    if pre_race_fill and pre in placed:
+        slots = [d for d in ctx.days if ctx.block(d) == ctx.last_week and d < ctx.race_date
+                 and not placed[d].get("fixed") and placed[d]["category"] in ("easy", "rest")]
+        shakeout = length_of(ctx, pre_race_fill)
+        lengths = [(length_of(ctx, placed[d]["wid"]), d) for d in slots if placed[d]["wid"]]
+        short = min(((n, d) for (kind, n), d in ((l, d) for l, d in lengths if l)
+                     if shakeout and kind == shakeout[0]), default=None)  # (length, date)
+        if pre in slots and short and short[0] <= shakeout[1]:
+            placed[pre], placed[short[1]] = placed[short[1]], placed[pre]
+        elif pre in slots:
+            if placed[pre]["wid"]:  # a longer plan run: move it to an earlier open day, if any
+                free = [d for d in slots if not placed[d]["wid"] and d != pre]
+                if free:
+                    placed[free[-1]], placed[pre] = placed[pre], placed[free[-1]]
+            if not placed[pre]["wid"]:
+                placed[pre] = filled(ctx, placed[pre], pre, pre_race_fill)
     for d in ctx.days:
-        item = placed[d]
-        if item["wid"] or d == ctx.race_date:
-            continue
-        wid = pre_race_fill if d == ctx.race_date - ONE else rest_fill
-        if wid:
-            was = f" (plan: {item['note']})" if item.get("note") else ""
-            placed[d] = {"wid": wid, "category": category_of(ctx.library, wid), "source_day": "(rest fill)",
-                         "note": f"rest day filled{was}", "naive": d}
+        if not placed[d]["wid"] and d != ctx.race_date and rest_fill:
+            placed[d] = filled(ctx, placed[d], d, rest_fill)
+
+
+def length_of(ctx, wid):
+    return run_length(str(ctx.library.get(wid, {}).get("workout_text") or ""))
+
+
+def filled(ctx, rest_item, d, wid):
+    was = f" (plan: {rest_item['note']})" if rest_item.get("note") else ""
+    return {"wid": wid, "category": category_of(ctx.library, wid), "source_day": "(rest fill)",
+            "note": f"rest day filled{was}", "naive": d}
 
 
 def violations(ctx, placed, allow_pre_long):

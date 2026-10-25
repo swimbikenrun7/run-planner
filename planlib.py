@@ -184,6 +184,26 @@ def easy_run_unit(texts):
     return "time" if time > distance else "distance"
 
 
+LENGTH_PART = re.compile(r"(\d+(?:\.\d+)?)(mi|km|mtr|h|m|s)")
+TO_METERS = {"mi": 1609.344, "km": 1000, "mtr": 1}
+TO_SECONDS = {"h": 3600, "m": 60, "s": 1}
+
+
+def run_length(text):
+    """A single-step run's length as ('distance', meters) or ('time', seconds); None otherwise."""
+    if not text or " / " in text:
+        return None
+    token = text.strip().split()[-1]
+    parts = LENGTH_PART.findall(token)
+    if not parts or "".join(n + u for n, u in parts) != token:
+        return None
+    if all(u in TO_METERS for _, u in parts):
+        return "distance", sum(float(n) * TO_METERS[u] for n, u in parts)
+    if all(u in TO_SECONDS for _, u in parts):
+        return "time", sum(float(n) * TO_SECONDS[u] for n, u in parts)
+    return None
+
+
 def plan_easy_texts(workout_ids, library):
     return [str(library[w].get("workout_text") or "") for w in workout_ids
             if w in library and str(library[w].get("category") or "").strip().lower() == "easy"]

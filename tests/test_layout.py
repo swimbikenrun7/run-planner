@@ -16,6 +16,7 @@ from layout import (
 from planlib import PlanError
 
 RACE = date(2027, 5, 2)  # a Sunday
+ONE_DAY = timedelta(days=1)
 TODAY = date(2026, 10, 16)
 HARD = {"interval", "tempo", "hills", "long", "tuneup", "race"}
 LIBRARY = {
@@ -27,8 +28,8 @@ LIBRARY = {
     "PACE": {"category": "tempo", "name": "HM pace"},
     "TUNE": {"category": "tuneup", "name": "5K race"},
     "RACE": {"category": "race", "name": "Race"},
-    "E3": {"category": "easy", "name": "Easy 3mi"},
-    "E2": {"category": "easy", "name": "Easy 2mi"},
+    "E3": {"category": "easy", "name": "Easy 3mi", "workout_text": "- Press lap 80% Pace 3mi"},
+    "E2": {"category": "easy", "name": "Easy 2mi", "workout_text": "- Press lap 80% Pace 2mi"},
 }
 DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
@@ -165,3 +166,30 @@ def test_blank_fill_keeps_rest_days():
     placed, _ = place(ctx, week_tpl(sun="long", tue="quality", thu="quality", sat="quality"), True)
     fill_rest_days(ctx, placed, None, None)
     assert placed[RACE - timedelta(days=1)]["wid"] is None
+
+
+USER_WEEK = week_tpl(sat="long", mon="quality", wed="quality", fri="quality", thu=("fixed", "GROUP"))
+
+
+def race_week(plan_week):
+    ctx = ctx_for([HIGDON_WEEK, plan_week])
+    placed, _ = place(ctx, USER_WEEK, True)
+    fill_rest_days(ctx, placed, "E3", "E2")
+    return [placed[RACE - timedelta(days=k)]["wid"] for k in range(6, 0, -1)]  # Mon..Sat
+
+
+def test_race_week_plans_own_short_run_becomes_the_shakeout():
+    # Higdon race week: Mon 3mi, Tue intervals, Wed 2mi, Thu tempo, Fri/Sat rest (the user's edit)
+    assert race_week(["E3", "INT", "E2", "TEMPO", None, None, "RACE"]) == ["INT", "E3", "TEMPO", "GROUP", "E3", "E2"]
+
+
+def test_race_week_without_a_short_run_gets_the_shakeout_fill():
+    assert race_week(["E3", "INT", "E3", "TEMPO", None, None, "RACE"]) == ["INT", "E3", "TEMPO", "GROUP", "E3", "E2"]
+
+
+def test_longer_plan_run_the_day_before_the_race_moves_earlier():
+    ctx = ctx_for([HIGDON_WEEK, ["E3", None, None, None, None, "E3", "RACE"]])
+    placed, _ = place(ctx, week_tpl(sun="long"), True)
+    fill_rest_days(ctx, placed, "E3", "E2")
+    assert placed[RACE - ONE_DAY]["wid"] == "E2"
+    assert [placed[RACE - timedelta(days=k)]["wid"] for k in range(6, 1, -1)] == ["E3"] * 5

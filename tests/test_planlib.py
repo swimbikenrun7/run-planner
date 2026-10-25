@@ -1,7 +1,7 @@
 import openpyxl
 import pytest
 
-from planlib import PlanError, easy_run_unit, lock_file, save_workbook
+from planlib import PlanError, easy_run_unit, lock_file, run_length, save_workbook
 
 
 def test_lock_file_sits_beside_workbook(tmp_path):
@@ -26,3 +26,10 @@ def test_easy_run_unit_follows_how_the_plan_writes_easy_runs():
     assert easy_run_unit(["- Press lap 80% Pace 3mi", "- Press lap 80% Pace 30m"]) == "distance"  # tie
     assert easy_run_unit(["- Press lap 80% Pace 30m", "- Press lap 80% Pace 45m", "- Press lap 80% Pace 5km"]) == "time"
     assert easy_run_unit(["Warmup / - Press lap Z2 Pace 10m / Main Set / - 3mi 80% Pace"]) == "distance"  # multi-step ignored
+
+
+def test_run_length_reads_the_last_length_of_a_single_step_run():
+    assert run_length("- Press lap 80% Pace 3mi") == ("distance", 3 * 1609.344)
+    assert run_length("- Press lap 80% Pace 67m30s") == ("time", 4050)
+    assert run_length("Warmup / - Press lap Z2 Pace 10m / Main Set / - 3mi 80% Pace") is None
+    assert run_length("- Uphill hard") is None
